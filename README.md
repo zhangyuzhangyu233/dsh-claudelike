@@ -1,17 +1,30 @@
+<div align="center">
+  <img src="docs/banner.png" alt="Code Ripple" width="100%" />
+</div>
+
 # dsh-claudelike
 
-一片「会呼吸的代码」背景：成片的等宽字符被一阵缓慢转向的风吹亮，每个格子按自己的节奏换字，指针划过留下一串余温，点击处荡开一圈由字符组成的水波（每第 3 次点击是心形）。
+> 想要 Claude 桌面端那种「一整片代码在呼吸」的动态背景，又不想为了一张背景去订阅、折腾账号？
+> 这个插件把那层效果做成了自己的——装进 DSH 就能用，也能单独当壁纸。
 
-Same effect, two forms:
+![DSH 里的实际效果](docs/screenshot.png)
+
+一片**会呼吸的代码**：成片的等宽字符被一阵缓慢转向的风吹亮，每个格子按自己的节奏换字；指针划过留下一串余温，点击处荡开一圈由字符组成的水波（每第 3 次点击是心形）。全部是 WebGL2 实时算的，不是贴图，也没有任何网络请求。
+
+## 两个形态，同一套引擎
 
 | 目录 | 是什么 |
 |---|---|
-| [`code-ripple-background/`](code-ripple-background) | **DeepSeek Harness Web UI 插件**（WebGL2）。装在 DSH 里，铺满整个界面 |
-| [`wallpaper/`](wallpaper) | **独立壁纸**：单文件 HTML，可直接在浏览器/Lively 使用，也能录成无缝循环视频喂给 Razer Axon 这类只吃视频的壁纸工具 |
+| [`code-ripple-background/`](code-ripple-background) | **DeepSeek Harness Web UI 插件**。装在 DSH 里，铺满整个界面 |
+| [`wallpaper/`](wallpaper) | **独立壁纸**：单文件 HTML，可直接在浏览器 / Lively 使用，也能录成无缝循环视频喂给 Razer Axon 这类只吃视频的壁纸工具 |
 
-两者共用同一套渲染引擎，观感一致。
+## 亮点
 
-> 预览：直接打开 `wallpaper/index.html`（或把它设成 Lively 壁纸）——它是一层铺满屏幕的暗色代码纹理，风过处字符成片亮起。
+- **实时风场**：阵风、细流、大尺度涌浪三层噪声叠加，光带真的在走，不是循环动画。
+- **字符会变**：每个格子有自己的字符序列和节奏，涟漪经过时加速翻滚——所以你看到的是「字符组成的波」，不是一圈光。
+- **跟手的余温**：指针留下一串有时间衰减的暖点，字符被逐个点亮，停手后慢慢凉下去。
+- **两种主题**：自动跟随 DSH 的明暗配色；壁纸版可用 `?theme=` 指定。
+- **无订阅、无联网、无遥测**：纯前端 Canvas/WebGL2，复制一个文件夹就能跑。
 
 ## 一、DSH 插件
 
@@ -31,7 +44,7 @@ install_bundle  target = <绝对路径>/code-ripple-background
 - 整层挂在 `shell.overlay`，`pointer-events: none`，不挡任何交互；
 - 渲染分两趟：① 风场写进 `cols × rows*2` 的 RGBA8 缓冲；② 每个格子 6 个顶点（`gl_VertexID`）从字符图集里取字，按风场逐像素受光；
 - 字符集是可打印 ASCII + `·`，16×6 图集；每个格子按种子轮流换字，涟漪经过时额外推进；
-- 「第 3 次点击是心形」沿用原型的彩蛋。
+- 「第 3 次点击是心形」是沿用的彩蛋。
 
 ## 二、独立壁纸
 
