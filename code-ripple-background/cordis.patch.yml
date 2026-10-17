@@ -1,0 +1,3 @@
+- insert:
+    - id: code-ripple-background
+      name: '@local/code-ripple-background'
