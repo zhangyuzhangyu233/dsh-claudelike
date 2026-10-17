@@ -57,7 +57,7 @@
   'use strict';
 
   var params = new URLSearchParams(location.search);
-  var THEME = params.get('theme') === 'light' ? 'light' : 'dark';
+  var EXPLICIT_THEME = params.get('theme');
   var CAPTURE = params.get('capture') === '1';
   var CONFIG = {
     strength: { scale: 1, base: 0.26, cap: 0.9, rest: 0.03 },
@@ -78,11 +78,89 @@
     if (cellParam >= 4 && cellParam <= 24) CONFIG.grid.cellCss = cellParam;
   }
 
+  // Theme: ?theme= wins; otherwise follow the host page, which may be light or
+  // dark and may switch at runtime (the Codex shell does).
+  function luminanceOf(color) {
+    return (0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]) / 255;
+  }
+  function sampleColor(value) {
+    var probe = document.createElement('canvas').getContext('2d');
+    if (!probe) return null;
+    probe.fillStyle = '#000';
+    probe.fillStyle = value;
+    probe.fillRect(0, 0, 1, 1);
+    var d = probe.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3] / 255];
+  }
+  function detectHostTheme() {
+    if (EXPLICIT_THEME === 'light' || EXPLICIT_THEME === 'dark') return EXPLICIT_THEME;
+    // The app usually paints on a wrapper, not on <body>, so probe what is
+    // actually behind the canvas at the centre of the screen and walk up from
+    // there: the first opaque surface is what the glyphs will sit on.
+    var probeEl = null;
+    try { probeEl = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2); } catch (error) { }
+    while (probeEl) {
+      var surface = sampleColor(getComputedStyle(probeEl).backgroundColor);
+      if (surface && surface[3] > 0.5) return luminanceOf(surface) > 0.55 ? 'light' : 'dark';
+      probeEl = probeEl.parentElement;
+    }
+    var nodes = [document.body, document.documentElement];
+    for (var i = 0; i < nodes.length; i++) {
+      if (!nodes[i]) continue;
+      var bg = sampleColor(getComputedStyle(nodes[i]).backgroundColor);
+      if (bg && bg[3] > 0.5) return luminanceOf(bg) > 0.55 ? 'light' : 'dark';
+    }
+    var scheme = getComputedStyle(document.documentElement).colorScheme || '';
+    if (scheme.indexOf('light') >= 0 && scheme.indexOf('dark') < 0) return 'light';
+    if (scheme.indexOf('dark') >= 0 && scheme.indexOf('light') < 0) return 'dark';
+    if (window.matchMedia) return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return 'dark';
+  }
+
+  var THEME = detectHostTheme();
   var INK = THEME === 'light' ? [0.11, 0.13, 0.19] : [0.91, 0.93, 0.97];
   var GLOW = CONFIG.glow.color[THEME];
   var OPACITY = Math.min(1, Math.min(CONFIG.strength.base * CONFIG.strength.scale, CONFIG.strength.cap) * CONFIG.glow.headroom);
 
-  document.body.classList.toggle('light', THEME === 'light');
+  function applyTheme(theme) {
+    THEME = theme;
+    INK = theme === 'light' ? [0.11, 0.13, 0.19] : [0.91, 0.93, 0.97];
+    GLOW = CONFIG.glow.color[theme];
+    if (window.__CODE_RIPPLE_EMBEDDED__ !== true && document.body) {
+      document.body.classList.toggle('light', theme === 'light');
+    }
+    if (typeof gl !== 'undefined' && gl && typeof glyphProgram !== 'undefined' && glyphProgram) {
+      gl.useProgram(glyphProgram);
+      gl.uniform3f(loc(glyphProgram, 'u_color'), INK[0], INK[1], INK[2]);
+      gl.uniform3f(loc(glyphProgram, 'u_glowColor'), GLOW[0], GLOW[1], GLOW[2]);
+      // Dark ink on white needs more weight than light ink on black: lift the
+      // gain and give every cell a small floor so the field is visible at rest.
+      gl.uniform1f(loc(glyphProgram, 'u_inkAlpha'), theme === 'light' ? 2.4 : 1.0);
+      gl.uniform1f(loc(glyphProgram, 'u_floor'), theme === 'light' ? 0.09 : 0.0);
+    }
+  }
+
+  function watchTheme() {
+    if (EXPLICIT_THEME) return;
+    var current = THEME;
+    var check = function () {
+      var next = detectHostTheme();
+      if (next !== current) {
+        current = next;
+        applyTheme(next);
+      }
+    };
+    try {
+      var mo = new MutationObserver(check);
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+      if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+    } catch (error) { }
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: light)');
+      if (mq.addEventListener) mq.addEventListener('change', check);
+    }
+    setInterval(check, 1500);
+  }
 
   var GLYPHS = (function () {
     var chars = [];
@@ -466,7 +544,7 @@ SH_PCG + SH_TAPS +
 'uniform highp sampler2D u_wind;\n' +
 'uniform vec3 u_color, u_glowColor;\n' +
 'uniform ivec2 u_buffer;\n' +
-'uniform float u_friction, u_glowAmount, u_inkAlpha;\n' +
+'uniform float u_friction, u_glowAmount, u_inkAlpha, u_floor;\n' +
 'out vec4 o;\n' +
 'const float REST = ' + N(CONFIG.strength.rest) + ';\n' +
 'const float HEAD = ' + N(CONFIG.glow.headroom) + ';\n' +
@@ -488,7 +566,7 @@ SH_PCG + SH_TAPS +
 '  float tint = smoothstep(0.04, 0.3, u_glowAmount * v_glow.x);\n' +
 '  float bright = min(1.0, light) * mix(u_inkAlpha, HEAD, tint);\n' +
 '  float left = u_glowAmount * 0.3 * v_glow.y * wind.a;\n' +
-'  float a = ink * min(1.0, (bright + left) / HEAD);\n' +
+'  float a = ink * min(1.0, (bright + left) / HEAD + u_floor);\n' +
 '  o = vec4((mix(u_color, u_glowColor, tint) * bright + u_glowColor * left) / (bright + left + 0.0001) * a, a);\n' +
 '}\n';
 
@@ -601,9 +679,7 @@ SH_PCG + SH_TAPS +
   gl.uniform1f(loc(glyphProgram, 'u_flick'), CONFIG.wind.flick);
   gl.uniform1f(loc(glyphProgram, 'u_friction'), CONFIG.wind.friction);
   gl.uniform1f(loc(glyphProgram, 'u_glowAmount'), CONFIG.glow.amount);
-  gl.uniform3f(loc(glyphProgram, 'u_color'), INK[0], INK[1], INK[2]);
-  gl.uniform3f(loc(glyphProgram, 'u_glowColor'), GLOW[0], GLOW[1], GLOW[2]);
-  gl.uniform1f(loc(glyphProgram, 'u_inkAlpha'), 1);
+  applyTheme(THEME);
 
   var touchLoc = {
     now: loc(windProgram, 'u_now'), tapCount: loc(windProgram, 'u_tapCount'), wakeCount: loc(windProgram, 'u_wakeCount'),
@@ -848,6 +924,7 @@ SH_PCG + SH_TAPS +
   });
 
   if (resize()) schedule(0);
+  watchTheme();
   setTimeout(hideHint, 9000);
 })();
 </script>

@@ -43,7 +43,7 @@ pwsh -File .\record.ps1 -Theme light -Seed 42 -Output .\loop-light.mp4
 
 | 参数 | 取值 | 默认 | 说明 |
 |---|---|---|---|
-| `theme` | `dark` / `light` | `dark` | 配色；浅色是深字浅底 |
+| `theme` | `dark` / `light` | 自动 | 配色；不传时跟随宿主页面的明暗（DSH / Codex 切主题会实时跟随） |
 | `cell` | 4–24 | `6.5` | 格子宽度（CSS px）。越小字越密，越大越疏 |
 | `look` | `mixed` / `lettered` / `figured` | `mixed` | 字符轮换序列，决定画面里字符的"性格" |
 | `seed` | 任意整数 | 随机 | 固定风向、速度、阵风尺寸，用来复现某一帧的气质 |
