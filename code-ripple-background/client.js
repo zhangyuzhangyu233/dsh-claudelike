@@ -284,6 +284,7 @@ float noise(vec3 p, uint salt) {
 uniform float u_now;
 uniform int u_tapCount;
 uniform vec4 u_taps[6];
+uniform float u_tapRadii[6];
 float heart(vec2 u) {
   float k = -u.x * u.x * u.y * u.y * u.y;
   float c = sign(k) * pow(abs(k), 1.0 / 3.0);
@@ -297,18 +298,19 @@ vec4 tapsAt(vec2 p, out vec2 glow) {
   for (int i = 0; i < 6; i++) {
     if (i >= u_tapCount) break;
     vec4 tap = u_taps[i];
+    float maxReach = u_tapRadii[i] > 10.0 ? u_tapRadii[i] : 620.0;
     float age = u_now - tap.z;
     vec2 away = p - tap.xy;
     float d = length(away);
     float reach = tap.w < 0.0 ? d / heart(away / max(d, 1.0)) : d;
-    float behind = 620.0 * (1.0 - exp(-age / 1.3)) - reach;
-    float width = 85.0 + 60.0 * age;
+    float behind = maxReach * (1.0 - exp(-age / 1.3)) - reach;
+    float width = min(85.0, maxReach * 0.3) + (maxReach / 620.0) * 60.0 * age;
     float front = smoothstep(-16.0, 10.0, behind) * exp(-behind * behind / (width * width));
     float swell = abs(tap.w) * exp(-age / 1.5) * front;
     sum.xy += (away / max(d, 1.0)) * (44.0 * swell);
-    sum.z += 1.9 * swell * (0.25 + 0.75 * cos(behind * (6.2831853 / 130.0)));
+    sum.z += 1.9 * swell * (0.25 + 0.75 * cos(behind * (6.2831853 / min(130.0, maxReach * 0.45))));
     sum.w += swell;
-    float trail = smoothstep(0.0, 70.0, behind) * exp(-max(behind, 0.0) / 260.0);
+    float trail = smoothstep(0.0, 70.0, behind) * exp(-max(behind, 0.0) / (maxReach * 0.42));
     glow.x += abs(tap.w) * (exp(-age / 1.0) * front + 0.7 * exp(-age / 1.3) * trail);
     glow.y += abs(tap.w) * (1.0 - exp(-age / 0.2)) * exp(-age / 1.2) * trail;
   }
@@ -665,18 +667,12 @@ void main() {
           premultipliedAlpha: true,
           preserveDrawingBuffer: false,
           powerPreference: 'low-power',
-          failIfMajorPerformanceCaveat: true,
+          failIfMajorPerformanceCaveat: false,
         });
       } catch (error) {
         gl = null;
       }
       if (!gl) {
-        canvas.remove();
-        return null;
-      }
-      const debug = gl.getExtension('WEBGL_debug_renderer_info');
-      if (debug && /swiftshader|llvmpipe|softpipe|software|warp|basic render/i.test(String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)))) {
-        gl.getExtension('WEBGL_lose_context')?.loseContext();
         canvas.remove();
         return null;
       }
@@ -727,6 +723,7 @@ void main() {
           tapCount: loc(p, 'u_tapCount'),
           wakeCount: loc(p, 'u_wakeCount'),
           taps: loc(p, 'u_taps'),
+          tapRadii: loc(p, 'u_tapRadii'),
           wakes: loc(p, 'u_wakes'),
           ways: loc(p, 'u_ways'),
         };
@@ -738,7 +735,10 @@ void main() {
         gl.uniform1i(locations.wakeCount, touch ? touch.wakeCount : 0);
         if (!touch) return;
         gl.uniform1f(locations.now, touch.now);
-        if (touch.tapCount > 0) gl.uniform4fv(locations.taps, touch.taps);
+        if (touch.tapCount > 0) {
+          gl.uniform4fv(locations.taps, touch.taps);
+          if (locations.tapRadii) gl.uniform1fv(locations.tapRadii, touch.tapRadii);
+        }
         if (touch.wakeCount > 0) {
           gl.uniform4fv(locations.wakes, touch.wakes);
           gl.uniform4fv(locations.ways, touch.ways);
@@ -901,6 +901,7 @@ void main() {
         now: 0,
         tapCount: 0,
         taps: new Float32Array(24),
+        tapRadii: new Float32Array(6),
         wakeCount: 0,
         wakes: new Float32Array(192),
         ways: new Float32Array(192),
@@ -938,10 +939,21 @@ void main() {
           ]);
           return true;
         },
-        tap: function (x, y, now) {
+        tap: function (x, y, now, radius, force, pinnedRight) {
           tapCount += 1;
-          const force = tapCount % HEART_EVERY === 0 ? -1.15 * CONFIG.touch.ripple : CONFIG.touch.ripple;
-          taps = taps.slice(-5).concat([{ x: x, y: y, at: now, force: force, wayX: 0, wayY: 0 }]);
+          const defaultForce = tapCount % HEART_EVERY === 0 ? -1.15 * CONFIG.touch.ripple : CONFIG.touch.ripple;
+          const f = force !== undefined ? force : defaultForce;
+          const r = radius !== undefined ? radius : 620.0;
+          taps = taps.slice(-5).concat([{
+            x: x,
+            y: y,
+            at: now,
+            force: f,
+            radius: r,
+            pinnedRight: Boolean(pinnedRight),
+            wayX: 0,
+            wayY: 0,
+          }]);
         },
         leave: function () {
           last = null;
@@ -952,13 +964,18 @@ void main() {
         rippling: function (now) {
           return taps.some((t) => now - t.at < TAP_LIFE);
         },
-        frame: function (now) {
+        frame: function (now, hostWidth) {
           taps = taps.filter((t) => now - t.at < TAP_LIFE);
           wakes = wakes.filter((w) => now - w.at < WAKE_LIFE);
           state.now = now;
           state.tapCount = taps.length;
           taps.forEach(function (tap, i) {
-            state.taps.set([tap.x, tap.y, tap.at, tap.force], i * 4);
+            let tapX = tap.x;
+            if (tap.pinnedRight && typeof hostWidth === 'number' && hostWidth > 0) {
+              tapX = hostWidth;
+            }
+            state.taps.set([tapX, tap.y, tap.at, tap.force], i * 4);
+            state.tapRadii[i] = tap.radius || 620.0;
           });
           const rest = 48 - wakes.length;
           let count = 0;
@@ -1032,8 +1049,35 @@ void main() {
       const hostRef = React.useRef(null);
 
       React.useEffect(() => {
-        const host = hostRef.current;
-        if (!host) return undefined;
+        const anchor = hostRef.current;
+        const overlay = anchor && anchor.closest('[data-shell-overlay]');
+        const appFrame = overlay && overlay.parentElement;
+        if (!appFrame) return undefined;
+
+        function findCenterCol() {
+          return (
+            appFrame.querySelector('[class*="centerCol"]') ||
+            appFrame.querySelector(':scope > div:has(> [data-slot="main"])') ||
+            appFrame.querySelector('[data-slot="main"]')?.parentElement
+          );
+        }
+
+        let centerCol = findCenterCol();
+
+        // Own a background node inside the main interface (center column)
+        // covering the entire conversation panel without masking top bar or bottom bar.
+        const host = document.createElement('div');
+        host.setAttribute('aria-hidden', 'true');
+        host.dataset.codeRippleBackground = '';
+        host.style.cssText =
+          'position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;z-index:0;overflow:hidden;pointer-events:none;user-select:none;' +
+          'font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;';
+
+        const mountTarget = centerCol || appFrame;
+        mountTarget.prepend(host);
+        if (centerCol) {
+          centerCol.setAttribute('data-code-ripple-center', '');
+        }
 
         const seed = (window.crypto && window.crypto.getRandomValues
           ? window.crypto.getRandomValues(new Uint32Array(1))[0]
@@ -1047,9 +1091,64 @@ void main() {
 
         const layer = createLayer(host, family, params);
         if (!layer) {
+          host.remove();
           if (window.console) window.console.warn('[code-ripple] WebGL2 layer unavailable');
           return undefined;
         }
+
+        // Style the conversation panel containers so the animation covers the
+        // entire conversation panel (top to bottom) without masking top/bottom bars,
+        // while keeping the sidebar completely untouched.
+        const previousFrame = appFrame.getAttribute('data-code-ripple-frame');
+        appFrame.setAttribute('data-code-ripple-frame', '');
+        const backgroundStyle = document.createElement('style');
+        backgroundStyle.textContent =
+          '[data-code-ripple-center]{' +
+          'position:relative!important;' +
+          'overflow:hidden!important;' +
+          '}' +
+          '[data-code-ripple-background]{' +
+          'position:absolute!important;' +
+          'inset:0!important;' +
+          'width:100%!important;' +
+          'height:100%!important;' +
+          'z-index:0!important;' +
+          'pointer-events:none!important;' +
+          'user-select:none!important;' +
+          'overflow:hidden!important;' +
+          '}' +
+          '[data-code-ripple-center] [data-slot="main"],' +
+          '[data-code-ripple-center] [data-slot="main.conversation"],' +
+          '[data-code-ripple-center] [data-slot="main"]>div,' +
+          '[data-code-ripple-center] [data-phase],' +
+          '[data-code-ripple-center] [class*="_root"][data-phase],' +
+          '[data-code-ripple-center] [data-conversation-scroll],' +
+          '[data-code-ripple-center] [data-slot="conversation.session"],' +
+          '[data-code-ripple-center] [data-slot="conversation.content"],' +
+          '[data-code-ripple-center] [class*="composerSeat"],' +
+          '[data-code-ripple-center] [data-composer-seat],' +
+          '[data-code-ripple-center] [data-conversation-region="composer"],' +
+          '[data-code-ripple-center] [class*="composerStack"],' +
+          '[data-code-ripple-center] [data-slot*="composer"],' +
+          '[data-code-ripple-center] [class*="dock"],' +
+          '[data-code-ripple-center] [class*="Dock"],' +
+          '[data-code-ripple-center] [class*="TurnUsage"],' +
+          '[data-code-ripple-center] [class*="scrollBody"],' +
+          '[data-code-ripple-center] [class*="viewArea"],' +
+          '[data-code-ripple-center] header,' +
+          '[data-code-ripple-center] [class*="_header"],' +
+          '[data-code-ripple-center] [class*="header"],' +
+          '[data-code-ripple-center] footer,' +
+          '[data-code-ripple-center] [class*="footer"],' +
+          '[data-code-ripple-center] [class*="statusBar"],' +
+          '[data-code-ripple-center] [class*="status-bar"],' +
+          '[data-code-ripple-center] [class*="bottomRow"]{' +
+          'position:relative!important;' +
+          'background-color:transparent!important;' +
+          'background-image:none!important;' +
+          'background:transparent!important;' +
+          '}';
+        document.head.appendChild(backgroundStyle);
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
@@ -1062,8 +1161,8 @@ void main() {
         layer.setGlow(CONFIG.glow.color[scheme]);
         let strength = Math.min(
           1,
-          Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
-            CONFIG.glow.headroom,
+          Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
+            CONFIG.glow.headroom),
         );
 
         let themeTimer = 0;
@@ -1077,8 +1176,8 @@ void main() {
           layer.setGlow(CONFIG.glow.color[scheme]);
           strength = Math.min(
             1,
-            Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
-              CONFIG.glow.headroom,
+            Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
+              CONFIG.glow.headroom),
           );
           layer.canvas.style.opacity = String(strength);
         }
@@ -1112,6 +1211,9 @@ void main() {
         let grid = null;
 
         function measure() {
+          host.style.top = '0px';
+          host.style.height = '100%';
+
           const dpr = window.devicePixelRatio || 1;
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
@@ -1149,22 +1251,46 @@ void main() {
           if (!start) start = clock;
           reveal = smoothstep((clock - start) / CONFIG.wind.revealS);
           layer.canvas.style.opacity = String(strength);
-          layer.draw({ time: clock * CONFIG.wind.energy, reveal: reveal, touch: touch.frame(clock) });
+          layer.draw({ time: clock * CONFIG.wind.energy, reveal: reveal, touch: touch.frame(clock, host.clientWidth) });
           schedule();
+        }
+
+        function isOverInteractive(event) {
+          const target = event.target;
+          if (target && target.closest && target.closest('button, a, input, textarea, [role="button"]')) {
+            return true;
+          }
+          return false;
         }
 
         function onPointerMove(event) {
           if (event.pointerType !== 'mouse') return;
+          if (isOverInteractive(event)) {
+            touch.leave();
+            return;
+          }
           const rect = layer.canvas.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
+          if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+            touch.leave();
+            return;
+          }
           if (touch.move(x, y, clock)) schedule();
         }
 
         function onPointerDown(event) {
           if (event.button !== 0) return;
+          if (isOverInteractive(event)) {
+            return;
+          }
           const rect = layer.canvas.getBoundingClientRect();
-          touch.tap(event.clientX - rect.left, event.clientY - rect.top, clock);
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+            return;
+          }
+          touch.tap(x, y, clock);
           schedule();
         }
 
@@ -1172,8 +1298,13 @@ void main() {
           touch.leave();
         }
 
-        function onResize() {
+        function onResize(immediate) {
           if (resizeTimer) clearTimeout(resizeTimer);
+          if (immediate || !grid) {
+            resizeTimer = 0;
+            measure();
+            return;
+          }
           resizeTimer = setTimeout(function () {
             resizeTimer = 0;
             measure();
@@ -1192,7 +1323,156 @@ void main() {
           schedule();
         }
 
+        // --- Sidebar expansion ripple detection ---
+        let prevLeftCollapsed = appFrame.hasAttribute('data-sidebar-collapsed');
+        let prevRightCollapsed = appFrame.hasAttribute('data-rightbar-collapsed');
+        let prevSidebarWidth = 0;
+        let prevRightbarWidth = 0;
+        let isReadyForSidebarRipples = false;
+        let lastLeftExpandTime = 0;
+        let lastRightExpandTime = 0;
+
+        function getLeftSidebarWidth() {
+          const sidebarEl = appFrame.querySelector('[class*="sidebarCol"], [data-slot="sidebar"]');
+          return sidebarEl ? Math.round(sidebarEl.getBoundingClientRect().width) : 0;
+        }
+
+        function getRightSidebarWidth() {
+          const rightbarEl = appFrame.querySelector('[data-rightbar-col], [class*="rightbarCol"]');
+          return rightbarEl ? Math.round(rightbarEl.getBoundingClientRect().width) : 0;
+        }
+
+        function triggerLeftSidebarRipple(customWidth) {
+          const now = performance.now();
+          if (now - lastLeftExpandTime < 700) return;
+          lastLeftExpandTime = now;
+
+          const rect = layer.canvas.getBoundingClientRect();
+          const radius = customWidth && customWidth > 50 ? customWidth : 280;
+          const x = 0;
+          const y = Math.round(rect.height / 2);
+          touch.tap(x, y, clock, radius, CONFIG.touch.ripple * 1.5, false);
+          schedule();
+        }
+
+        function triggerRightSidebarRipple(customWidth) {
+          const now = performance.now();
+          if (now - lastRightExpandTime < 700) return;
+          lastRightExpandTime = now;
+
+          const rect = layer.canvas.getBoundingClientRect();
+          const radius = customWidth && customWidth > 50 ? customWidth : 400;
+          const x = Math.round(rect.width);
+          const y = Math.round(rect.height / 2);
+          touch.tap(x, y, clock, radius, CONFIG.touch.ripple * 1.5, true);
+          schedule();
+        }
+
+        function checkSidebarExpansion() {
+          if (!isReadyForSidebarRipples) return;
+          const isLeftCollapsed = appFrame.hasAttribute('data-sidebar-collapsed');
+          const isRightCollapsed = appFrame.hasAttribute('data-rightbar-collapsed');
+
+          const curSidebarWidth = getLeftSidebarWidth();
+          const curRightbarWidth = getRightSidebarWidth();
+
+          // Left sidebar expanded:
+          // Transited from collapsed to expanded, or width expanded from near 0 to normal width
+          if ((prevLeftCollapsed && !isLeftCollapsed) || (prevSidebarWidth <= 20 && curSidebarWidth > 50)) {
+            triggerLeftSidebarRipple(curSidebarWidth > 50 ? curSidebarWidth : 280);
+          }
+
+          // Right sidebar expanded:
+          // Transited from collapsed to expanded, or width expanded from near 0 to normal width
+          if ((prevRightCollapsed && !isRightCollapsed) || (prevRightbarWidth <= 20 && curRightbarWidth > 50)) {
+            triggerRightSidebarRipple(curRightbarWidth > 50 ? curRightbarWidth : 400);
+          }
+
+          prevLeftCollapsed = isLeftCollapsed;
+          prevRightCollapsed = isRightCollapsed;
+          prevSidebarWidth = curSidebarWidth;
+          prevRightbarWidth = curRightbarWidth;
+        }
+
+        // Arm sidebar expansion ripples after initial layout settles
+        setTimeout(function () {
+          prevLeftCollapsed = appFrame.hasAttribute('data-sidebar-collapsed');
+          prevRightCollapsed = appFrame.hasAttribute('data-rightbar-collapsed');
+          prevSidebarWidth = getLeftSidebarWidth();
+          prevRightbarWidth = getRightSidebarWidth();
+          isReadyForSidebarRipples = true;
+        }, 500);
+
+        // Listen for dimension changes on centerCol & host (handles sidebar drag/toggle, window resize)
+        const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(function () {
+          onResize();
+          checkSidebarExpansion();
+        }) : null;
+        if (resizeObserver) {
+          if (centerCol) resizeObserver.observe(centerCol);
+          resizeObserver.observe(host);
+        }
+
+        // Dedicated observer for appFrame attributes (data-sidebar-collapsed, data-rightbar-collapsed)
+        const sidebarObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(function () {
+          checkSidebarExpansion();
+        }) : null;
+        if (sidebarObserver) {
+          sidebarObserver.observe(appFrame, {
+            attributes: true,
+            attributeFilter: ['data-sidebar-collapsed', 'data-rightbar-collapsed', 'style'],
+          });
+        }
+
         measure();
+
+        // If centerCol wasn't immediately found, observe appFrame until it appears
+        let frameObserver = null;
+        if (!centerCol) {
+          frameObserver = new MutationObserver(function () {
+            const found = findCenterCol();
+            if (found) {
+              centerCol = found;
+              centerCol.setAttribute('data-code-ripple-center', '');
+              if (host.parentElement !== centerCol) {
+                centerCol.prepend(host);
+              }
+              if (resizeObserver) resizeObserver.observe(centerCol);
+              if (childObserver) {
+                childObserver.observe(centerCol, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true,
+                  attributeFilter: ['data-phase', 'class'],
+                });
+              }
+              measure();
+              if (frameObserver) {
+                frameObserver.disconnect();
+                frameObserver = null;
+              }
+            }
+          });
+          frameObserver.observe(appFrame, { childList: true, subtree: true });
+        }
+
+        // Watch centerCol to ensure host remains prepended across React reconciliations
+        // and react immediately when switching between hero and active conversation phases
+        const childObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(function () {
+          if (centerCol && host.parentElement !== centerCol) {
+            centerCol.prepend(host);
+          }
+          measure();
+        }) : null;
+        if (childObserver && centerCol) {
+          childObserver.observe(centerCol, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-phase', 'class'],
+          });
+        }
+
         window.addEventListener('pointermove', onPointerMove, { passive: true, capture: true });
         window.addEventListener('pointerdown', onPointerDown, { passive: true, capture: true });
         window.addEventListener('pointerleave', onPointerLeave, { passive: true });
@@ -1206,6 +1486,10 @@ void main() {
           if (timer) clearTimeout(timer);
           if (resizeTimer) clearTimeout(resizeTimer);
           if (themeTimer) clearTimeout(themeTimer);
+          if (frameObserver) frameObserver.disconnect();
+          if (childObserver) childObserver.disconnect();
+          if (sidebarObserver) sidebarObserver.disconnect();
+          if (resizeObserver) resizeObserver.disconnect();
           themeObserver.disconnect();
           window.removeEventListener('pointermove', onPointerMove, { capture: true });
           window.removeEventListener('pointerdown', onPointerDown, { capture: true });
@@ -1214,21 +1498,20 @@ void main() {
           document.removeEventListener('visibilitychange', onVisibility);
           delete host.dataset.landingTexture;
           layer.destroy();
+          host.remove();
+          backgroundStyle.remove();
+          if (previousFrame === null) appFrame.removeAttribute('data-code-ripple-frame');
+          else appFrame.setAttribute('data-code-ripple-frame', previousFrame);
+          if (centerCol) {
+            centerCol.removeAttribute('data-code-ripple-center');
+          }
         };
       }, []);
 
-      return h('div', {
+      return h('span', {
         ref: hostRef,
         'aria-hidden': true,
-        style: {
-          position: 'fixed',
-          inset: 0,
-          overflow: 'hidden',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          fontFamily:
-            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-        },
+        hidden: true,
       });
     }
 
