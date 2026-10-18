@@ -3,7 +3,7 @@
   "version": "2.1.1",
   "private": true,
   "type": "module",
-  "description": "Ambient field of drifting code characters confined to the Harness conversation panel, with pointer warmth and click ripples; no dimming veil, the texture stays clearly visible.",
+  "description": "Ambient field of drifting code characters confined to the Harness conversation panel, kept clearly visible, with pointer warmth and click ripples.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -18,11 +18,15 @@
     "icon.svg"
   ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-layout"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
     }
   }
 }
