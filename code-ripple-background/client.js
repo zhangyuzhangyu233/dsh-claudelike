@@ -1063,6 +1063,14 @@ void main() {
         }
 
         let centerCol = findCenterCol();
+        // Strictly conversation-panel only: no conversation column means no
+        // background at all, instead of falling back to the whole app frame.
+        if (!centerCol) {
+          if (window.console) {
+            window.console.warn('[code-ripple] conversation panel not found; background stays off');
+          }
+          return undefined;
+        }
 
         // Own a background node inside the main interface (center column)
         // covering the entire conversation panel without masking top bar or bottom bar.
@@ -1073,8 +1081,7 @@ void main() {
           'position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;z-index:0;overflow:hidden;pointer-events:none;user-select:none;' +
           'font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;';
 
-        const mountTarget = centerCol || appFrame;
-        mountTarget.prepend(host);
+        centerCol.prepend(host);
         if (centerCol) {
           centerCol.setAttribute('data-code-ripple-center', '');
         }
@@ -1096,6 +1103,22 @@ void main() {
           return undefined;
         }
 
+        /*
+         * Readability veil: a theme-tinted scrim between the glyph field and the
+         * conversation content. It tones the moving characters down where the
+         * user reads, so paragraphs and code stay legible while the texture is
+         * still visible in the gaps.
+         */
+        const veil = document.createElement('div');
+        veil.setAttribute('aria-hidden', 'true');
+        veil.dataset.codeRippleVeil = '';
+        host.appendChild(veil);
+        function veilFor(current) {
+          return current === 'dark'
+            ? 'linear-gradient(180deg, rgba(13,13,16,0.30) 0%, rgba(13,13,16,0.46) 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.58) 100%)';
+        }
+
         // Style the conversation panel containers so the animation covers the
         // entire conversation panel (top to bottom) without masking top/bottom bars,
         // while keeping the sidebar completely untouched.
@@ -1106,6 +1129,12 @@ void main() {
           '[data-code-ripple-center]{' +
           'position:relative!important;' +
           'overflow:hidden!important;' +
+          '}' +
+          '[data-code-ripple-veil]{' +
+          'position:absolute!important;' +
+          'inset:0!important;' +
+          'pointer-events:none!important;' +
+          'z-index:1!important;' +
           '}' +
           '[data-code-ripple-background]{' +
           'position:absolute!important;' +
@@ -1152,13 +1181,14 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '2.0.0';
+        layer.canvas.dataset.version = '2.1.0';
 
         const touch = createTouch();
         let scheme = readScheme();
         let ink = colorParts(readThemeInk());
         layer.setInk(ink.rgb, ink.alpha);
         layer.setGlow(CONFIG.glow.color[scheme]);
+        veil.style.background = veilFor(scheme);
         let strength = Math.min(
           1,
           Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
@@ -1179,6 +1209,7 @@ void main() {
             Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
               CONFIG.glow.headroom),
           );
+          veil.style.background = veilFor(scheme);
           layer.canvas.style.opacity = String(strength);
         }
         const themeObserver = new MutationObserver(function () {

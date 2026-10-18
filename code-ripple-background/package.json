@@ -1,6 +1,6 @@
 {
   "name": "@local/code-ripple-background",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "description": "Ambient field of drifting code characters with pointer warmth and click ripples for the Harness Web UI.",

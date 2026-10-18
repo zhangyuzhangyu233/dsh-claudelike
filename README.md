@@ -2,7 +2,7 @@
   <img src="docs/banner.png" alt="Code Ripple" width="100%" />
 </div>
 
-# dsh-claudelike
+# dsh-coderipple
 
 > 想要 Claude 桌面端那种「一整片代码在呼吸」的动态背景，又不想为了一张背景去订阅、折腾账号？
 > 这个插件把那层效果做成了自己的——装进 DSH 就能用，也能单独当壁纸。
@@ -11,11 +11,21 @@
 
 一片**会呼吸的代码**：成片的等宽字符被一阵缓慢转向的风吹亮，每个格子按自己的节奏换字；指针划过留下一串余温，点击处荡开一圈由字符组成的水波（每第 3 次点击是心形）。全部是 WebGL2 实时算的，不是贴图，也没有任何网络请求。
 
+## 最新更新 · v2.1.0：只覆盖会话面板 + 可读性
+
+这次直接修掉了动态背景一直以来的两个问题：
+
+- **背景严格限定在主会话面板内**：插件现在只在 `centerCol`（会话列）里创建画布，找不到会话面板就**不渲染**，不再回退到整窗。侧栏、顶栏、底栏都不会被盖住，滚动、输入框、composer 全部保持原生观感。
+- **新增可读性衬层（veil）**：在字符层和正文之间加了一层随主题变化的渐变压暗——暗色主题从 30% 过渡到 46%，亮色主题从 42% 过渡到 58%。字符纹理退到文字后面，长段落和代码块不再被跳动的字符抢注意力，空白处依然看得到"呼吸感"。
+- 版本号 `2.1.0`；主题切换时衬层会自动跟随重算。
+
+升级方式：更新 `code-ripple-background/` 后重启 DSH（或刷新页面）即可，插件会自动卸载旧层并挂载新层。
+
 ## 两个形态，同一套引擎
 
 | 目录 | 是什么 |
 |---|---|
-| [`code-ripple-background/`](code-ripple-background) | **DeepSeek Harness Web UI 插件**。装在 DSH 里，铺满整个界面 |
+| [`code-ripple-background/`](code-ripple-background) | **DeepSeek Harness Web UI 插件**。装在 DSH 里，只铺满主会话面板 |
 | [`wallpaper/`](wallpaper) | **独立壁纸**：单文件 HTML，可直接在浏览器 / Lively 使用，也能录成无缝循环视频喂给 Razer Axon 这类只吃视频的壁纸工具 |
 
 ## 亮点
@@ -23,6 +33,8 @@
 - **实时风场**：阵风、细流、大尺度涌浪三层噪声叠加，光带真的在走，不是循环动画。
 - **字符会变**：每个格子有自己的字符序列和节奏，涟漪经过时加速翻滚——所以你看到的是「字符组成的波」，不是一圈光。
 - **跟手的余温**：指针留下一串有时间衰减的暖点，字符被逐个点亮，停手后慢慢凉下去。
+- **会话面板专属**：背景只存在于主会话列，侧栏、顶栏、底栏和右侧面板都干净。
+- **为阅读让路**：可读性衬层按明暗主题压暗字符层，正文对比度优先。
 - **两种主题**：自动跟随 DSH 的明暗配色；壁纸版可用 `?theme=` 指定。
 - **无订阅、无联网、无遥测**：纯前端 Canvas/WebGL2，复制一个文件夹就能跑。
 
@@ -41,9 +53,10 @@ install_bundle  target = <绝对路径>/code-ripple-background
 
 实现要点：
 
-- 整层挂在 `shell.overlay`，`pointer-events: none`，不挡任何交互；
+- 整层挂在 `shell.overlay`，再挂进会话列 `centerCol`，`pointer-events: none`，不挡任何交互；
 - 渲染分两趟：① 风场写进 `cols × rows*2` 的 RGBA8 缓冲；② 每个格子 6 个顶点（`gl_VertexID`）从字符图集里取字，按风场逐像素受光；
 - 字符集是可打印 ASCII + `·`，16×6 图集；每个格子按种子轮流换字，涟漪经过时额外推进；
+- 可读性衬层是画布之上的主题渐变层，只压暗背景、不影响正文；
 - 「第 3 次点击是心形」是沿用的彩蛋。
 
 ## 二、独立壁纸
@@ -93,4 +106,4 @@ pwsh -File wallpaper/record.ps1 -Theme light -Seed 42
 
 ---
 
-**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, plus a standalone single-file live wallpaper with a seamless-video recorder. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.
+**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, confined to the main conversation panel with a theme-aware readability veil, plus a standalone single-file live wallpaper with a seamless-video recorder. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.
