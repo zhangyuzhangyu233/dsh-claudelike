@@ -26,7 +26,7 @@ window.__ModuleLoader__.load({
     const CONFIG = {
       strength: {
         scale: 1,
-        base: { dark: 0.26, light: 0.26 },
+        base: { dark: 0.3, light: 0.3 },
         cap: { dark: 0.9, light: 0.9 },
         rest: 0.03,
       },
@@ -48,7 +48,7 @@ window.__ModuleLoader__.load({
       },
       glow: {
         amount: 1,
-        headroom: 3,
+        headroom: 3.2,
         color: { dark: [0.1, 0.68, 1], light: [0, 0.25, 1] },
       },
       touch: { stir: 1, ripple: 1, slowPxS: 60, fastPxS: 800 },
@@ -1103,22 +1103,6 @@ void main() {
           return undefined;
         }
 
-        /*
-         * Readability veil: a theme-tinted scrim between the glyph field and the
-         * conversation content. It tones the moving characters down where the
-         * user reads, so paragraphs and code stay legible while the texture is
-         * still visible in the gaps.
-         */
-        const veil = document.createElement('div');
-        veil.setAttribute('aria-hidden', 'true');
-        veil.dataset.codeRippleVeil = '';
-        host.appendChild(veil);
-        function veilFor(current) {
-          return current === 'dark'
-            ? 'linear-gradient(180deg, rgba(13,13,16,0.30) 0%, rgba(13,13,16,0.46) 100%)'
-            : 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.58) 100%)';
-        }
-
         // Style the conversation panel containers so the animation covers the
         // entire conversation panel (top to bottom) without masking top/bottom bars,
         // while keeping the sidebar completely untouched.
@@ -1129,12 +1113,6 @@ void main() {
           '[data-code-ripple-center]{' +
           'position:relative!important;' +
           'overflow:hidden!important;' +
-          '}' +
-          '[data-code-ripple-veil]{' +
-          'position:absolute!important;' +
-          'inset:0!important;' +
-          'pointer-events:none!important;' +
-          'z-index:1!important;' +
           '}' +
           '[data-code-ripple-background]{' +
           'position:absolute!important;' +
@@ -1181,14 +1159,13 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '2.1.0';
+        layer.canvas.dataset.version = '2.1.1';
 
         const touch = createTouch();
         let scheme = readScheme();
         let ink = colorParts(readThemeInk());
         layer.setInk(ink.rgb, ink.alpha);
         layer.setGlow(CONFIG.glow.color[scheme]);
-        veil.style.background = veilFor(scheme);
         let strength = Math.min(
           1,
           Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
@@ -1209,8 +1186,7 @@ void main() {
             Math.max(0.65, Math.min(CONFIG.strength.base[scheme] * CONFIG.strength.scale, CONFIG.strength.cap[scheme]) *
               CONFIG.glow.headroom),
           );
-          veil.style.background = veilFor(scheme);
-          layer.canvas.style.opacity = String(strength);
+            layer.canvas.style.opacity = String(strength);
         }
         const themeObserver = new MutationObserver(function () {
           if (themeTimer) clearTimeout(themeTimer);
