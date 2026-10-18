@@ -1,6 +1,6 @@
 {
   "name": "@local/code-ripple-background",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "description": "Ambient field of drifting code characters confined to the Harness conversation panel, kept clearly visible, with pointer warmth and click ripples.",

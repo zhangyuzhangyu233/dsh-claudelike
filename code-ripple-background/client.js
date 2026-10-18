@@ -1078,7 +1078,7 @@ void main() {
         host.setAttribute('aria-hidden', 'true');
         host.dataset.codeRippleBackground = '';
         host.style.cssText =
-          'position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;z-index:0;overflow:hidden;pointer-events:none;user-select:none;' +
+          'position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none;user-select:none;' +
           'font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;';
 
         centerCol.prepend(host);
@@ -1112,14 +1112,17 @@ void main() {
         backgroundStyle.textContent =
           '[data-code-ripple-center]{' +
           'position:relative!important;' +
-          'overflow:hidden!important;' +
+          'z-index:0!important;' +
+          'isolation:isolate!important;' +
+          'background-color:transparent!important;' +
+          'overflow:clip!important;' +
           '}' +
           '[data-code-ripple-background]{' +
           'position:absolute!important;' +
           'inset:0!important;' +
           'width:100%!important;' +
           'height:100%!important;' +
-          'z-index:0!important;' +
+          'z-index:-1!important;' +
           'pointer-events:none!important;' +
           'user-select:none!important;' +
           'overflow:hidden!important;' +
@@ -1150,7 +1153,6 @@ void main() {
           '[data-code-ripple-center] [class*="statusBar"],' +
           '[data-code-ripple-center] [class*="status-bar"],' +
           '[data-code-ripple-center] [class*="bottomRow"]{' +
-          'position:relative!important;' +
           'background-color:transparent!important;' +
           'background-image:none!important;' +
           'background:transparent!important;' +
@@ -1159,7 +1161,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '2.1.1';
+        layer.canvas.dataset.version = '2.1.2';
 
         const touch = createTouch();
         let scheme = readScheme();
