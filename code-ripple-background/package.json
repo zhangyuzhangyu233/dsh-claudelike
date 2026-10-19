@@ -1,9 +1,9 @@
 {
   "name": "dsh-coderipple",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "private": false,
   "type": "module",
-  "description": "Seven switchable code-art background presets (ambient code field, DeepSeek whale, maid portraits, rotating 3D globe, scrolling continents) for the DeepSeek Harness Web UI.",
+  "description": "Seven switchable code-art background presets (ambient code field, DeepSeek whale, maid portraits, rotating 3D globe, and a static earth-continent map without Antarctica) for the DeepSeek Harness Web UI.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

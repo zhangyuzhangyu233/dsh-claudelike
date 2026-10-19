@@ -6,6 +6,14 @@
 - 尺寸：自适应分辨率与 DPI（格子 6.5 CSS px，最多 2100 万设备像素）
 - 性能：空闲约 30fps、涟漪期间 60fps；切到后台自动暂停
 
+## 地球动态壁纸（earth.html）
+
+把插件里的「立体地球」预设单独提取成的壁纸：只有大陆、没有海洋，50m 精度海岸线，球体缓慢自转，背面大陆以低透明度透出；指针划过有暖光余温，点击会把字符组成的球面冲散再重新聚合。单文件、内嵌陆地遮罩，无依赖、无联网。
+
+- 文件：[earth.html](earth.html)
+- 安装方式与 `index.html` 相同（Lively / Wallpaper Engine / 浏览器全屏）
+- 支持 `theme` / `cell` / `seed` / `auto` / `capture` 参数；地球没有 `look` 参数（大陆轮廓固定）
+
 ## 用 Lively Wallpaper（推荐，免费开源）
 
 1. 安装 [Lively Wallpaper](https://github.com/rocksdanister/lively)（Microsoft Store 也有）。

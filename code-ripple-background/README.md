@@ -7,7 +7,7 @@ Seven switchable code-art background presets for the **DeepSeek Harness** Web UI
 - DeepSeek whale mark
 - whale maid & chibi maid portraits
 - rotating 3D globe (continents only, far side translucent)
-- scrolling continents
+- static earth-continent map, centred, without Antarctica
 
 All presets share click-ripple dispersion, regional shimmer and live glyph animation.
 

@@ -66,7 +66,7 @@
         { key: "maid", label: "\u9CB8\u9C7C\u5973\u4EC6" },
         { key: "chibi", label: "Q\u7248\u9CB8\u9C7C\u5973\u4EC6" },
         { key: "earth", label: "\u7ACB\u4F53\u5730\u7403" },
-        { key: "pan", label: "\u5927\u9646\u6A2A\u79FB" }
+        { key: "pan", label: "\u5730\u7403\u5927\u9646" }
       ];
       const presetListeners = /* @__PURE__ */ new Set();
       function normalizePreset(value) {
@@ -560,24 +560,33 @@ void main() {
     strength = 1.0 - (1.0 - strength) * (1.0 - 0.85 * warm * smoothstep(-0.5, 0.25, grain));
   }
   if (u_hero > 0.5 && u_heroPan > 0.5) {
-    // Flat continents scrolling left -> right, at the same scale as the globe.
-    float radius = min(u_paneCss.x, u_paneCss.y) * 0.64;
-    float mapH = radius * 2.0;
+    // Flat world map, held still and centred. Antarctica is cut away: the map
+    // is cropped just south of Cape Horn and the remaining ~147 degrees of
+    // latitude fill the pane height. The map stays 2:1 (width = twice the pane
+    // height), so only the middle longitudes are visible.
+    float mapH = u_paneCss.y;
     float mapW = mapH * 2.0;
+    float vSpan = 0.8166;
     float ripple = clamp(abs(hand.z) * 0.55 + hand.w * 0.35 + warm * 0.40, 0.0, 1.0);
     vec2 jitter = vec2(
       noise(vec3(p * 0.012, u_time * 2.6), 0x61u),
       noise(vec3(p * 0.012 + vec2(7.7, 2.0), u_time * 2.6 + 2.0), 0x62u)) - 0.5;
     vec2 pp = p + (hand.xy * 0.30 + jitter * (10.0 + 46.0 * ripple)) * ripple;
-    float offset = u_time * 60.0;
+    // Centred on the map itself (u = 0.5 is the prime meridian), static.
     vec2 uvp = vec2(
-      (pp.x - 0.5 * u_paneCss.x + offset) / mapW,
-      (pp.y - 0.5 * u_paneCss.y) / mapH + 0.5);
+      (pp.x - 0.5 * u_paneCss.x) / mapW + 0.5,
+      (pp.y / u_paneCss.y) * vSpan);
     float land = texture(u_earth, uvp).r;
     float coast = smoothstep(0.22, 0.78, land);
     float holes = noise(vec3(p / 24.0, u_time * 2.2), 0x63u);
     coast *= 1.0 - 0.90 * ripple * smoothstep(0.10, 0.55, holes);
-    float heroStrength = coast * 1.7 + hand.z * 0.6;
+    // Interleaved regional highlights: slow drifting blobs + a diagonal wave,
+    // so different stretches of the frozen map light up in turn.
+    float regionA = noise(vec3(uvp * vec2(3.2, 2.4), u_time * 0.20), 0x41u);
+    float regionB = noise(vec3(uvp * vec2(5.4, 4.0) + vec2(5.0, 2.0), u_time * 0.30 + 2.0), 0x42u);
+    float wave = 0.5 + 0.5 * sin((uvp.x * 2.2 + uvp.y * 1.4) * TAU + u_time * 0.85);
+    float region = smoothstep(0.24, 0.70, 0.55 * regionA + 0.25 * regionB + 0.20 * wave);
+    float heroStrength = coast * mix(0.30, 2.05, region) + hand.z * 0.6;
     if (warm > 0.0) {
       float hgrain = 0.55 * fine.y + 0.45 * tiny.x;
       heroStrength = 1.0 - (1.0 - heroStrength) * (1.0 - 0.95 * warm * smoothstep(-0.5, 0.25, hgrain));
@@ -1403,7 +1412,7 @@ void main() {
           rememberLook(params.key);
           host.dataset.landingTexture = "canvas";
           layer.canvas.dataset.look = params.key + "/" + params.seed.toString(16);
-          layer.canvas.dataset.version = "3.0.1";
+          layer.canvas.dataset.version = "3.1.0";
           const touch = createTouch();
           let scheme = readScheme();
           let ink = colorParts(readThemeInk());
