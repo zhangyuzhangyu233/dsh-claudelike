@@ -1,6 +1,6 @@
 {
   "name": "@local/code-ripple-background",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "private": true,
   "type": "module",
   "description": "Seven switchable code-art background presets for the Harness Web UI: ambient code field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents - all with click-ripple dispersion.",

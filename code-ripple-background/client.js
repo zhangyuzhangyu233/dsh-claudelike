@@ -642,9 +642,10 @@ void main() {
     float globe = 0.0;
     if (d2 < 1.0) {
       float z = sqrt(max(0.0, 1.0 - d2));
-      vec3 n = normalize(vec3(q.x, -q.y, z));
       float spin = u_time * 0.18;
       float cs = cos(spin), sn = sin(spin);
+      // front hemisphere
+      vec3 n = normalize(vec3(q.x, -q.y, z));
       vec3 w = vec3(cs * n.x + sn * n.z, n.y, -sn * n.x + cs * n.z);
       float lat = asin(clamp(w.y, -1.0, 1.0));
       float lon = atan(w.x, w.z);
@@ -656,6 +657,16 @@ void main() {
       float limb = smoothstep(0.02, 0.45, z);
       float edge = smoothstep(1.0, 0.965, d2);
       globe = coast * lit * (0.50 + 0.50 * limb) * edge;
+      // far-side continents seen through the globe as a faint reflection
+      vec3 nb = normalize(vec3(q.x, -q.y, -z));
+      vec3 wb = vec3(cs * nb.x + sn * nb.z, nb.y, -sn * nb.x + cs * nb.z);
+      float latb = asin(clamp(wb.y, -1.0, 1.0));
+      float lonb = atan(wb.x, wb.z);
+      vec2 uvb = vec2(lonb * (1.0 / TAU) + 0.5, 0.5 - latb * (1.0 / 3.14159265));
+      float landb = texture(u_earth, uvb).r;
+      float coastb = smoothstep(0.22, 0.78, landb);
+      float backFade = 0.75 + 0.25 * smoothstep(0.0, 0.5, z);
+      globe += coastb * 0.25 * backFade * edge;
     }
     float holes = noise(vec3(p / 24.0, u_time * 2.2), 0x63u);
     globe *= 1.0 - 0.90 * ripple * smoothstep(0.10, 0.55, holes);
@@ -1544,7 +1555,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '2.9.0';
+        layer.canvas.dataset.version = '2.9.1';
 
         const touch = createTouch();
         let scheme = readScheme();
