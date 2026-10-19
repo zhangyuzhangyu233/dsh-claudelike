@@ -10,6 +10,11 @@
 
 全部由等宽代码字符实时拼成：跟着桌面一起呼吸，也会被你的鼠标点击打散，再在 1–2 秒内重新聚合。纯 WebGL2 实时计算，不是贴图，没有任何网络请求。
 
+[![npm](https://img.shields.io/npm/v/dsh-coderipple)](https://www.npmjs.com/package/dsh-coderipple)
+[![MIT](https://img.shields.io/badge/license-MIT-3fbf7f)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/zhangyuzhangyu233/dsh-coderipple)](https://github.com/zhangyuzhangyu233/dsh-coderipple/releases)
+
+
 ## 演示
 
 ![立体地球 · 点击涟漪冲散大陆](docs/screenshots/presets-globe.gif)
@@ -70,6 +75,16 @@
 ## 一、DSH 插件
 
 `code-ripple-background/` 是一个标准的 Cordis bundle（`dsh.bundle.patch` + `./client`），不依赖任何第三方运行时。
+
+### 方式一：从 npm 安装（推荐）
+
+```bash
+npm install dsh-coderipple
+# 或直接在 DSH 里：
+dsh plugin --profile desktop add dsh-coderipple
+```
+
+### 方式二：本地目录安装
 
 1. 把 `code-ripple-background/` 放到磁盘任意位置；
 2. 在 DSH 的插件管理里「从本地目录安装」，或直接调用 Harness 的 `plugin_manager` 工具：

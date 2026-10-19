@@ -7,7 +7,7 @@
 
   // src/client.ts
   window.__ModuleLoader__.load({
-    id: "@local/code-ripple-background",
+    id: "dsh-coderipple",
     factory(require2) {
       const React = require2("react");
       const h = React.createElement;
@@ -1403,7 +1403,7 @@ void main() {
           rememberLook(params.key);
           host.dataset.landingTexture = "canvas";
           layer.canvas.dataset.look = params.key + "/" + params.seed.toString(16);
-          layer.canvas.dataset.version = "3.0.0";
+          layer.canvas.dataset.version = "3.0.1";
           const touch = createTouch();
           let scheme = readScheme();
           let ink = colorParts(readThemeInk());

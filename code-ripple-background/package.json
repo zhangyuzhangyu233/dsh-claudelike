@@ -1,9 +1,9 @@
 {
-  "name": "@local/code-ripple-background",
-  "version": "3.0.0",
-  "private": true,
+  "name": "dsh-coderipple",
+  "version": "3.0.1",
+  "private": false,
   "type": "module",
-  "description": "Seven switchable code-art background presets for the Harness Web UI (TypeScript source, esbuild bundle).",
+  "description": "Seven switchable code-art background presets (ambient code field, DeepSeek whale, maid portraits, rotating 3D globe, scrolling continents) for the DeepSeek Harness Web UI.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -15,7 +15,9 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {
@@ -36,5 +38,30 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "title": "Code Ripple — code-art backgrounds for DeepSeek Harness",
+  "author": "zhangyuzhangyu233",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangyuzhangyu233/dsh-coderipple.git"
+  },
+  "homepage": "https://github.com/zhangyuzhangyu233/dsh-coderipple#readme",
+  "bugs": {
+    "url": "https://github.com/zhangyuzhangyu233/dsh-coderipple/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "wallpaper",
+    "live-wallpaper",
+    "webgl",
+    "code-art"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

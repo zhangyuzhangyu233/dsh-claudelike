@@ -26,7 +26,7 @@ declare global {
 }
 
 window.__ModuleLoader__.load({
-  id: '@local/code-ripple-background',
+  id: 'dsh-coderipple',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -1563,7 +1563,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.0.0';
+        layer.canvas.dataset.version = '3.0.1';
 
         const touch = createTouch();
         let scheme = readScheme();
