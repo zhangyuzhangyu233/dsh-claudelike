@@ -1,9 +1,9 @@
 {
   "name": "@local/code-ripple-background",
-  "version": "2.9.1",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Seven switchable code-art background presets for the Harness Web UI: ambient code field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents - all with click-ripple dispersion.",
+  "description": "Seven switchable code-art background presets for the Harness Web UI (TypeScript source, esbuild bundle).",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -28,5 +28,13 @@
         "@deepseek-ai/dsh-client-ui-layout"
       ]
     }
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
   }
 }

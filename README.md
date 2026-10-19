@@ -132,6 +132,25 @@ pwsh -File wallpaper/record.ps1 -Theme light -Seed 42
 
 > 以上为路线图，具体能力会随版本推进；欢迎 issue / PR 讨论你最想导入的素材。
 
+## 源码与构建（TypeScript）
+
+插件源码已经用 TypeScript 重写，仓库里的 `client.js` / `index.js` 是构建产物（仍然零运行时依赖、单文件加载）：
+
+| 路径 | 内容 |
+|---|---|
+| `src/client.ts` | Web UI 插件主逻辑（类型化：预设、地球、涟漪、渲染器） |
+| `src/host.ts` | Host 半，`apply()` 空实现 |
+| `src/types.ts` | DSH 上下文、Layer、预设等类型 |
+| `assets/*.b64` | 陆地遮罩、鲸鱼女仆 / Q版细节图、鲸鱼矢量路径（构建时内联为 data URL） |
+| `scripts/build.mjs` | esbuild 打包脚本，生成 `client.js` 与 `index.js` |
+
+```bash
+cd code-ripple-background
+pnpm install
+pnpm build      # 生成 client.js / index.js
+pnpm typecheck  # tsc 类型检查
+```
+
 ## 环境要求
 
 - 需要 **WebGL2** 与硬件加速；软件渲染（SwiftShader 之类）会被跳过；
