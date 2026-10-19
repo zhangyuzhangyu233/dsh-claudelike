@@ -166,6 +166,12 @@ pnpm build      # 生成 client.js / index.js
 pnpm typecheck  # tsc 类型检查
 ```
 
+## 名称与分发
+
+- 官方发布渠道：GitHub 仓库 [`zhangyuzhangyu233/dsh-coderipple`](https://github.com/zhangyuzhangyu233/dsh-coderipple) 与 npm 包 **`dsh-coderipple`**；
+- 代码以 MIT 授权，欢迎 fork / PR，但请使用**不同的包名与仓库名**，不要以本项目名义发布；
+- npm 包附带 provenance（来源证明）工作流，发布版本可追溯到本仓库的 commit。
+
 ## 环境要求
 
 - 需要 **WebGL2** 与硬件加速；软件渲染（SwiftShader 之类）会被跳过；
