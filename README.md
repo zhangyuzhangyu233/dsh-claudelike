@@ -4,12 +4,18 @@
 
 # dsh-coderipple
 
-> 想要 Claude 桌面端那种「一整片代码在呼吸」的动态背景，又不想为了一张背景去订阅、折腾账号？
-> 这个插件把那层效果做成了自己的——装进 DSH 就能用，也能单独当壁纸。
+> **让会话背景，成为一整套可切换的代码艺术。**
 
-![DSH 里的实际效果](docs/screenshot.png)
+曾经，它是 Claude 桌面端那一整片会呼吸的代码；现在，它可以是 DeepSeek 的鲸鱼、系着围裙的鲸鱼女仆、一颗缓缓自转的立体地球、横向流动的大陆，或者干脆什么都没有。
 
-一片**会呼吸的代码**：成片的等宽字符被一阵缓慢转向的风吹亮，每个格子按自己的节奏换字；指针划过留下一串余温，点击处荡开一圈由字符组成的水波（每第 3 次点击是心形）。全部是 WebGL2 实时算的，不是贴图，也没有任何网络请求。
+全部由等宽代码字符实时拼成：跟着桌面一起呼吸，也会被你的鼠标点击打散，再在 1–2 秒内重新聚合。纯 WebGL2 实时计算，不是贴图，没有任何网络请求。
+
+## 演示
+
+![立体地球 · 点击涟漪冲散大陆](docs/screenshots/presets-globe.gif)
+
+> 真实录屏（GIF 已压缩）：立体地球自转、大陆轮廓与明暗，以及点击后涟漪把画面冲散、再重新聚合的过程。
+
 
 ## 最新更新 · v2.9.0：7 种背景预设
 
@@ -110,6 +116,19 @@ pwsh -File wallpaper/record.ps1 -Theme light -Seed 42
 | `auto` | `1` / `0` | `1` | 无人操作时是否自动生成涟漪 |
 | `capture` | `1` / `0` | `0` | 录制模式：隐藏提示文字，配合 `record.ps1` |
 
+## 路线图：自定义素材（计划中）
+
+预设只是起点。接下来会把背景系统开放为「**可导入素材**」：
+
+- **静态素材**：立绘、人像、Logo、梗图……自动抠图后转成代码字符画；
+- **动态素材**：循环视频 / 序列帧，让素材真正「动」在背景里；
+- **内置调节**：字符密度、亮度与对比、区域高亮、涟漪强度；
+- **每个会话独立设置**：像主题一样保存、切换与分享。
+
+你可以把任何角色带进来——比如让 **蔡徐坤** 的循环在会话背后跳动，或者让 **时雨羽衣** 的立绘以代码字符的形式站在输入框后面。无论静态还是动态，都只是素材的一种。
+
+> 以上为路线图，具体能力会随版本推进；欢迎 issue / PR 讨论你最想导入的素材。
+
 ## 环境要求
 
 - 需要 **WebGL2** 与硬件加速；软件渲染（SwiftShader 之类）会被跳过；
@@ -126,4 +145,4 @@ pwsh -File wallpaper/record.ps1 -Theme light -Seed 42
 
 ---
 
-**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, confined to the main conversation panel and kept clearly visible, plus seven switchable code-art background presets (ambient field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents) and a standalone single-file live wallpaper with a seamless-video recorder. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.
+**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, confined to the main conversation panel and kept clearly visible, plus seven switchable code-art background presets (ambient field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents) and a standalone single-file live wallpaper with a seamless-video recorder. The roadmap opens the background up to custom static and animated material imports. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.
