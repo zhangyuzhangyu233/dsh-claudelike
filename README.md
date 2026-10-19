@@ -11,13 +11,32 @@
 
 一片**会呼吸的代码**：成片的等宽字符被一阵缓慢转向的风吹亮，每个格子按自己的节奏换字；指针划过留下一串余温，点击处荡开一圈由字符组成的水波（每第 3 次点击是心形）。全部是 WebGL2 实时算的，不是贴图，也没有任何网络请求。
 
-## 最新更新 · v2.1.2：修复滚动/下拉时输入框与状态栏被拖走
+## 最新更新 · v2.9.0：7 种背景预设
 
-- 修复：此前为了让正文浮在背景之上，插件给 composer、header、footer、dock 等容器强制加了 `position:relative`，把原生的 sticky/fixed 定位覆盖掉了——滚动或下拉时输入框、状态栏会跟着内容一起移动。
-- 现在改为：背景层使用**负 z-index**（`z-index:-1`）置于所有常规内容之下，不再需要给任何内容元素改 `position`；
-- 会话列改为 `overflow:clip`，既裁掉画布又不创建滚动容器，输入框、标题栏、底栏恢复原生 sticky/fixed 行为；
-- 背景仍然**只覆盖会话面板**、不加任何压暗蒙版、保持清晰明显。
-- 版本号 `2.1.2`。
+背景不再是固定效果，而是一套可切换的**代码艺术预设**。设置 → 通用里有两个独立下拉：
+
+- **新会话背景**（Hero 页）
+- **工作会话背景**（打开对话后）
+
+两边都可以选以下任一预设：
+
+| 预设 | 效果 |
+|---|---|
+| **（默认）** | 原版流动代码风场，字符随时间呼吸、指针余温、点击涟漪 |
+| **无背景** | 整个背景层隐藏，只剩原生界面 |
+| **DeepSeek 鲸鱼** | 官方鲸鱼矢量标，由代码字符拼成，居中、固定 |
+| **鲸鱼女仆** | 灰度细节代码肖像：面板高 1.9 倍、围裙小鲸鱼兜子正好压在底边框 |
+| **Q版鲸鱼女仆** | Q 版细节肖像，居中、高度占满面板 |
+| **立体地球** | 真正的 3D 球体自转，只显示大陆（无海洋），50m 精度海岸线 |
+| **大陆横移** | 平面世界大陆从左向右缓缓滚动，尺寸与立体地球一致 |
+
+所有预设共享同一套交互：
+
+- **区域交错高亮**：不同区域轮流变亮变暗（鲸鱼/女仆/地球）；
+- **字符实时变动**：代码字符持续滚动换字；
+- **点击涟漪**：鼠标点击处把画面冲散、穿孔、增亮，1–2 秒内自动还原；
+- **只覆盖会话面板**、不加压暗蒙版；
+- 不再覆盖输入框/标题栏的 sticky 定位（滚动不再拖走输入框）。
 
 升级方式：更新 `code-ripple-background/` 后刷新 DSH 页面（或重启）即可。
 
@@ -37,6 +56,7 @@
 - **明显的动态背景**：不叠加任何压暗蒙版，字符纹理全程清晰可见。
 - **两种主题**：自动跟随 DSH 的明暗配色；壁纸版可用 `?theme=` 指定。
 - **无订阅、无联网、无遥测**：纯前端 Canvas/WebGL2，复制一个文件夹就能跑。
+- **7 种预设**：默认风场 / 无背景 / 鲸鱼 / 鲸鱼女仆 / Q版女仆 / 立体地球 / 大陆横移，新会话与工作会话可分别设置。
 
 ## 一、DSH 插件
 
@@ -106,4 +126,4 @@ pwsh -File wallpaper/record.ps1 -Theme light -Seed 42
 
 ---
 
-**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, confined to the main conversation panel and kept clearly visible, plus a standalone single-file live wallpaper with a seamless-video recorder. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.
+**English** — A wind-lit field of drifting code characters: a WebGL2 plugin for the DeepSeek Harness Web UI, confined to the main conversation panel and kept clearly visible, plus seven switchable code-art background presets (ambient field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents) and a standalone single-file live wallpaper with a seamless-video recorder. MIT licensed. The visual language is inspired by the Claude desktop landing texture; this is an independent reimplementation with no Anthropic code or assets included, and no affiliation.

@@ -1,9 +1,9 @@
 {
   "name": "@local/code-ripple-background",
-  "version": "2.1.2",
+  "version": "2.9.0",
   "private": true,
   "type": "module",
-  "description": "Ambient field of drifting code characters confined to the Harness conversation panel, kept clearly visible, with pointer warmth and click ripples.",
+  "description": "Seven switchable code-art background presets for the Harness Web UI: ambient code field, DeepSeek whale mark, maid portraits, a rotating 3D globe and scrolling continents - all with click-ripple dispersion.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
