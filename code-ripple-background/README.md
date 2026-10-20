@@ -1,6 +1,6 @@
 # dsh-coderipple
 
-Seven switchable code-art background presets for the **DeepSeek Harness** Web UI:
+Nine switchable code-art background presets for the **DeepSeek Harness** Web UI:
 
 - （默认）ambient code field
 - 无背景 / none
@@ -8,6 +8,9 @@ Seven switchable code-art background presets for the **DeepSeek Harness** Web UI
 - whale maid & chibi maid portraits
 - rotating 3D globe (continents only, far side translucent)
 - static earth-continent map, centred, without Antarctica
+
+Presets: ambient wind, none, DeepSeek whale, whale maid, chibi maid, 3D globe, earth-continent map,
+Alan Turing portrait (EN) and Alan Turing portrait (Chinese).
 
 All presets share click-ripple dispersion, regional shimmer and live glyph animation.
 

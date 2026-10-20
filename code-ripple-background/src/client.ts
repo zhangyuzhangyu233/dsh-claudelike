@@ -14,7 +14,8 @@
  *
  * Build: `pnpm build` (esbuild -> ../client.js).
  */
-import { CHIBI_MASK_SRC, EARTH_MASK_SRC, LOGO_PATH, MAID_MASK_SRC } from './generated/assets';
+import { CHIBI_MASK_SRC, EARTH_MASK_SRC, LOGO_PATH, MAID_MASK_SRC, TURING_MASK_SRC,
+  TURING_ZH_MASK_SRC } from './generated/assets';
 import type { DshContext } from './types';
 
 declare global {
@@ -88,6 +89,9 @@ window.__ModuleLoader__.load({
     /* Chibi whale maid: detail portrait, fills the panel height, centred. */
     const CHIBI_DISPLAY_HEIGHT = 1.0;
 
+    /* Alan Turing portraits: detail masks with the name/date block beside the
+     * portrait; the whole landscape mask hugs the bottom-right panel corner. */
+
 
     const HERO_PRESET_KEY = 'dsh-code-ripple-hero-preset';
     const WORK_PRESET_KEY = 'dsh-code-ripple-work-preset';
@@ -97,19 +101,23 @@ window.__ModuleLoader__.load({
       { key: 'whale', label: 'DeepSeek 鲸鱼' },
       { key: 'maid', label: '鲸鱼女仆' },
       { key: 'chibi', label: 'Q版鲸鱼女仆' },
+      { key: 'turing', label: '艾伦·图灵' },
+      { key: 'turingzh', label: '艾伦·图灵（中文）' },
       { key: 'earth', label: '立体地球' },
       { key: 'pan', label: '地球大陆' },
     ];
     const presetListeners = new Set<(hero: string, work: string) => void>();
     function normalizePreset(value) {
       return value === 'maid' || value === 'chibi' || value === 'whale' || value === 'earth'
-        || value === 'pan' || value === 'smoke' ? value : 'none';
+        || value === 'pan' || value === 'turing' || value === 'turingzh' || value === 'smoke'
+        ? value : 'none';
     }
     function readPreset(key) {
       try {
         const saved = window.localStorage.getItem(key);
         if (saved === 'maid' || saved === 'chibi' || saved === 'whale' || saved === 'earth'
-          || saved === 'pan' || saved === 'smoke' || saved === 'none') return saved;
+          || saved === 'pan' || saved === 'turing' || saved === 'turingzh' || saved === 'smoke'
+          || saved === 'none') return saved;
       } catch (error) { /* ignore */ }
       return 'smoke';
     }
@@ -192,6 +200,48 @@ window.__ModuleLoader__.load({
       image.src = MAID_MASK_SRC;
     }
 
+    const turingMask = { image: null, loading: false, waiters: [] };
+    function loadTuringMask(callback) {
+      if (turingMask.image) { callback(); return; }
+      turingMask.waiters.push(callback);
+      if (turingMask.loading) return;
+      turingMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        turingMask.image = image;
+        turingMask.loading = false;
+        turingMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        turingMask.loading = false;
+        turingMask.waiters.length = 0;
+      };
+      image.src = TURING_MASK_SRC;
+    }
+
+
+    const turingZhMask = { image: null, loading: false, waiters: [] };
+    function loadTuringZhMask(callback) {
+      if (turingZhMask.image) { callback(); return; }
+      turingZhMask.waiters.push(callback);
+      if (turingZhMask.loading) return;
+      turingZhMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        turingZhMask.image = image;
+        turingZhMask.loading = false;
+        turingZhMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        turingZhMask.loading = false;
+        turingZhMask.waiters.length = 0;
+      };
+      image.src = TURING_ZH_MASK_SRC;
+    }
 
     const ATLAS_COLS = 16;
     const ATLAS_ROWS = 6;
@@ -497,6 +547,7 @@ uniform float u_tail, u_sweep;
 uniform float u_morph;
 uniform float u_hero;
 uniform float u_heroDetail;
+uniform float u_heroStill;
 uniform float u_heroEarth;
 uniform float u_heroPan;
 uniform highp sampler2D u_earth;
@@ -721,11 +772,13 @@ void main() {
     float regionA = noise(vec3(luv * vec2(2.6, 2.2), u_time * 0.20), 0x41u);
     float regionB = noise(vec3(luv * vec2(4.7, 3.6) + vec2(5.0, 2.0), u_time * 0.30 + 2.0), 0x42u);
     float wave = 0.5 + 0.5 * sin((luv.x * 1.7 + luv.y * 1.1) * TAU + u_time * 0.85);
-    float region = smoothstep(0.30, 0.70, 0.55 * regionA + 0.25 * regionB + 0.20 * wave);
+    float region = u_heroStill > 0.5
+      ? 0.72
+      : smoothstep(0.30, 0.70, 0.55 * regionA + 0.25 * regionB + 0.20 * wave);
     float logoStrength = shape * mix(0.55, 2.1, region);
     // The ambient code field keeps animating outside the mark; the whale is a
     // brighter overlay on top of it, not a replacement for the background.
-    float ambient = strength * 0.42;
+    float ambient = u_heroStill > 0.5 ? 0.0 : strength * 0.42;
     float heroStrength = max(ambient, logoStrength);
     // Click ripples brighten and scramble a local patch; the field recovers as
     // the tap decays (hand.z/hand.w are the existing ripple envelopes).
@@ -1042,6 +1095,7 @@ void main() {
         inkAlpha: loc(glyphProgram, 'u_inkAlpha'),
         hero: loc(windProgram, 'u_hero'),
         heroDetail: loc(windProgram, 'u_heroDetail'),
+        heroStill: loc(windProgram, 'u_heroStill'),
         heroEarth: loc(windProgram, 'u_heroEarth'),
         heroPan: loc(windProgram, 'u_heroPan'),
         heroGlyph: loc(glyphProgram, 'u_hero'),
@@ -1122,9 +1176,12 @@ void main() {
       let lastHeroDpr = 1;
       let lastUsedPreset = 'none';
       let heroOn = false;
+
       function uploadLogoMask(rect, dpr, preset) {
         const maskPreset = preset || 'none';
         if (maskPreset === 'earth' || maskPreset === 'pan') { ensureEarthTexture(); return; }
+        lastHeroRect = rect;
+        lastHeroDpr = dpr;
         const width = Math.max(8, Math.round(rect.width * dpr));
         const height = Math.max(8, Math.round(rect.height * dpr));
         if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === maskPreset) return;
@@ -1154,6 +1211,40 @@ void main() {
           const offsetX = (width - drawWidth) * 0.5;
           const offsetY = (height - drawHeight) * 0.5;
           ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+        } else if (maskPreset === 'turing') {
+          if (!turingMask.image) {
+            loadTuringMask(function () {
+              logoMaskWidth = 0;
+              logoMaskHeight = 0;
+              if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
+            });
+            return;
+          }
+          const image = turingMask.image;
+          const imageWidth = image.naturalWidth || image.width || 1;
+          const imageHeight = image.naturalHeight || image.height || 1;
+          const scale = Math.min(width / imageWidth, height / imageHeight);
+          const drawWidth = imageWidth * scale;
+          const drawHeight = imageHeight * scale;
+          ctx.drawImage(image, width - drawWidth, height - drawHeight,
+            drawWidth, drawHeight);
+        } else if (maskPreset === 'turingzh') {
+          if (!turingZhMask.image) {
+            loadTuringZhMask(function () {
+              logoMaskWidth = 0;
+              logoMaskHeight = 0;
+              if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
+            });
+            return;
+          }
+          const image = turingZhMask.image;
+          const imageWidth = image.naturalWidth || image.width || 1;
+          const imageHeight = image.naturalHeight || image.height || 1;
+          const scale = Math.min(width / imageWidth, height / imageHeight);
+          const drawWidth = imageWidth * scale;
+          const drawHeight = imageHeight * scale;
+          ctx.drawImage(image, width - drawWidth, height - drawHeight,
+            drawWidth, drawHeight);
         } else if (maskPreset === 'maid') {
           if (!maidMask.image) {
             loadMaidMask(function () {
@@ -1222,7 +1313,9 @@ void main() {
         heroOn = Boolean(active);
         gl.useProgram(windProgram);
         gl.uniform1f(U.hero, active ? 1 : 0);
-        gl.uniform1f(U.heroDetail, maskPreset === 'maid' || maskPreset === 'chibi' ? 1 : 0);
+        gl.uniform1f(U.heroDetail, maskPreset === 'maid' || maskPreset === 'chibi'
+          || maskPreset === 'turing' || maskPreset === 'turingzh' ? 1 : 0);
+        gl.uniform1f(U.heroStill, maskPreset === 'turing' || maskPreset === 'turingzh' ? 1 : 0);
         gl.uniform1f(U.heroEarth, maskPreset === 'earth' ? 1 : 0);
         gl.uniform1f(U.heroPan, maskPreset === 'pan' ? 1 : 0);
         gl.useProgram(glyphProgram);
@@ -1572,7 +1665,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.1.0';
+        layer.canvas.dataset.version = '3.2.0';
 
         const touch = createTouch();
         let scheme = readScheme();
@@ -1847,7 +1940,8 @@ void main() {
         function computeBackgroundRect(preset) {
           const width = Math.max(1, host.clientWidth);
           const height = Math.max(1, host.clientHeight);
-          if (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan') {
+          if (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
+            || preset === 'turing' || preset === 'turingzh') {
             return { left: 0, top: 0, width: width, height: height };
           }
           const aspect = LOGO_VIEWBOX.width / LOGO_VIEWBOX.height;
@@ -1871,12 +1965,14 @@ void main() {
           const phase = currentConversationPhase();
           const preset = presetForPhase(phase);
           const next = preset === 'whale' || preset === 'maid' || preset === 'chibi'
-            || preset === 'earth' || preset === 'pan';
+            || preset === 'earth' || preset === 'pan' || preset === 'turing'
+            || preset === 'turingzh';
           // "none" hides the whole field; "smoke" is the original ambient code wind.
           layer.setBackgroundVisible(preset !== 'none');
           // Presets are drawn with a denser grid so the artwork stays crisp.
           const targetCell = next
-            ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan' ? 4.5 : 5.0)
+            ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
+              || preset === 'turing' || preset === 'turingzh' ? 4.5 : 5.0)
             : BASE_CELL_CSS;
           if (CONFIG.grid.cellCss !== targetCell) {
             CONFIG.grid.cellCss = targetCell;
