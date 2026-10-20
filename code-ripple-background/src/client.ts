@@ -1176,6 +1176,9 @@ void main() {
       let lastHeroDpr = 1;
       let lastUsedPreset = 'none';
       let heroOn = false;
+      // 'hero' shows the mask with the baked quote/name/dates; anything else
+      // (conversation) crops the mask down to the portrait only.
+      let textPhase = 'hero';
 
       function uploadLogoMask(rect, dpr, preset) {
         const maskPreset = preset || 'none';
@@ -1184,7 +1187,9 @@ void main() {
         lastHeroDpr = dpr;
         const width = Math.max(8, Math.round(rect.width * dpr));
         const height = Math.max(8, Math.round(rect.height * dpr));
-        if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === maskPreset) return;
+        const portraitVariant = maskPreset === 'turing' || maskPreset === 'turingzh';
+        const cacheKey = maskPreset + (portraitVariant ? ':' + textPhase : '');
+        if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === cacheKey) return;
         const mask = document.createElement('canvas');
         mask.width = width;
         mask.height = height;
@@ -1224,10 +1229,15 @@ void main() {
           const imageWidth = image.naturalWidth || image.width || 1;
           const imageHeight = image.naturalHeight || image.height || 1;
           const scale = Math.min(width / imageWidth, height / imageHeight);
-          const drawWidth = imageWidth * scale;
-          const drawHeight = imageHeight * scale;
-          ctx.drawImage(image, width - drawWidth, height - drawHeight,
-            drawWidth, drawHeight);
+          if (textPhase === 'hero') {
+            ctx.drawImage(image, width - imageWidth * scale, height - imageHeight * scale,
+              imageWidth * scale, imageHeight * scale);
+          } else {
+            // Portrait-only crop: the mask is 1500x1000 with the portrait flush
+            // to the bottom-right 900x900 corner; drop the text plate area.
+            const s = 900 * scale;
+            ctx.drawImage(image, 600, 100, 900, 900, width - s, height - s, s, s);
+          }
         } else if (maskPreset === 'turingzh') {
           if (!turingZhMask.image) {
             loadTuringZhMask(function () {
@@ -1241,10 +1251,13 @@ void main() {
           const imageWidth = image.naturalWidth || image.width || 1;
           const imageHeight = image.naturalHeight || image.height || 1;
           const scale = Math.min(width / imageWidth, height / imageHeight);
-          const drawWidth = imageWidth * scale;
-          const drawHeight = imageHeight * scale;
-          ctx.drawImage(image, width - drawWidth, height - drawHeight,
-            drawWidth, drawHeight);
+          if (textPhase === 'hero') {
+            ctx.drawImage(image, width - imageWidth * scale, height - imageHeight * scale,
+              imageWidth * scale, imageHeight * scale);
+          } else {
+            const s = 900 * scale;
+            ctx.drawImage(image, 600, 100, 900, 900, width - s, height - s, s, s);
+          }
         } else if (maskPreset === 'maid') {
           if (!maidMask.image) {
             loadMaidMask(function () {
@@ -1275,7 +1288,7 @@ void main() {
         uploadTexture(gl, UNITS.logo, 'rgba8', width, height, new Uint8Array(ctx.getImageData(0, 0, width, height).data));
         logoMaskWidth = width;
         logoMaskHeight = height;
-        logoMaskPreset = maskPreset;
+        logoMaskPreset = cacheKey;
       }
 
       let earthUploaded = false;
@@ -1368,6 +1381,9 @@ void main() {
         setInk: setInk,
         setGlow: setGlow,
         setBackgroundVisible: setBackgroundVisible,
+        setTextPhase: function (phase) {
+          textPhase = phase === 'hero' ? 'hero' : 'active';
+        },
         setHero: setHero,
         reloadHeroMask: reloadHeroMask,
         draw: draw,
@@ -1665,7 +1681,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.3.1';
+        layer.canvas.dataset.version = '3.3.2';
 
         const touch = createTouch();
         let scheme = readScheme();
@@ -1980,6 +1996,7 @@ void main() {
           }
           // The spinning globe needs a smoother cadence than the ambient field.
           CONFIG.power.frameMs = preset === 'earth' ? 16 : BASE_FRAME_MS;
+          layer.setTextPhase(phase === 'hero' ? 'hero' : 'active');
           const rect = next ? computeBackgroundRect(preset) : null;
           layer.setHero(next, rect, window.devicePixelRatio || 1, preset);
           backgroundActive = next;
