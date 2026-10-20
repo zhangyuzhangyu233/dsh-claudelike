@@ -980,6 +980,17 @@ void main() {
         'position:absolute;left:0;top:0;display:block;pointer-events:none;opacity:0;transition:opacity 500ms ease-out;';
       host.appendChild(canvas);
 
+      // Layered portrait presets: the glyph layer draws only the portrait;
+      // this transparent canvas adds the crisp text on top. It sits below the
+      // chat UI (the whole host is z-index:-1) and is deliberately dimmed so
+      // conversation text stays dominant.
+      const textCanvas = document.createElement('canvas');
+      textCanvas.setAttribute('aria-hidden', 'true');
+      textCanvas.style.cssText =
+        'position:absolute;left:0;top:0;display:none;pointer-events:none;opacity:0;'
+        + 'transition:opacity 400ms ease;';
+      host.appendChild(textCanvas);
+
       let gl = null;
       try {
         gl = canvas.getContext('webgl2', {
@@ -1176,6 +1187,101 @@ void main() {
       let lastHeroDpr = 1;
       let lastUsedPreset = 'none';
       let heroOn = false;
+      let textAllowed = false;
+      const TEXT_ALPHA = 0.82;
+
+      function renderPortraitText() {
+        const portraitPreset = lastUsedPreset === 'turing' || lastUsedPreset === 'turingzh';
+        const active = heroOn && portraitPreset;
+        textCanvas.style.display = active ? '' : 'none';
+        if (!active || !lastHeroRect) return;
+        textCanvas.style.opacity = textAllowed ? '1' : '0';
+        const rect = lastHeroRect;
+        const dpr = lastHeroDpr || 1;
+        const cssW = Math.max(1, rect.width);
+        const cssH = Math.max(1, rect.height);
+        textCanvas.style.left = rect.left + 'px';
+        textCanvas.style.top = rect.top + 'px';
+        textCanvas.style.width = cssW + 'px';
+        textCanvas.style.height = cssH + 'px';
+        const devW = Math.max(8, Math.round(cssW * dpr));
+        const devH = Math.max(8, Math.round(cssH * dpr));
+        if (textCanvas.width !== devW) textCanvas.width = devW;
+        if (textCanvas.height !== devH) textCanvas.height = devH;
+        const tctx = textCanvas.getContext('2d');
+        if (!tctx) return;
+        tctx.setTransform(1, 0, 0, 1, 0, 0);
+        tctx.clearRect(0, 0, devW, devH);
+        tctx.scale(dpr, dpr);
+
+        // Both masks are 1500x1000, portrait flush to the bottom-right corner.
+        const scale = Math.min(cssW / 1500, cssH / 1000);
+        const ox = cssW - 1500 * scale;
+        const oy = cssH - 1000 * scale;
+        const S = scale;
+        const zh = lastUsedPreset === 'turingzh';
+        const serifRegular = "'Noto Serif SC','Source Han Serif SC','Times New Roman','Songti SC',serif";
+        const serifHeavy = "'Source Han Serif SC Heavy','Source Han Serif SC','Noto Serif SC','Songti SC',serif";
+        const textX = ox + 55 * S;
+        const maxWidth = 505 * S;
+
+        tctx.fillStyle = 'rgba(243, 247, 255, ' + TEXT_ALPHA + ')';
+        tctx.textBaseline = 'top';
+        tctx.textAlign = 'left';
+
+        if (zh) {
+          // Chinese: wrap per character
+          tctx.font = Math.round(42 * S) + 'px ' + serifRegular;
+          const quote = '我们只能看到前方很短的一段距离，但能看到大量需要完成的工作。';
+          let y = oy + 350 * S;
+          let line = '';
+          for (let i = 0; i < quote.length; i++) {
+            const next = line + quote[i];
+            if (tctx.measureText(next).width > maxWidth && line) {
+              tctx.fillText(line, textX, y);
+              y += 42 * 1.48 * S;
+              line = quote[i];
+            } else {
+              line = next;
+            }
+          }
+          if (line) tctx.fillText(line, textX, y);
+          y += 42 * 1.48 * S + 26 * S;
+          tctx.font = '900 ' + Math.round(44 * S) + 'px ' + serifHeavy;
+          tctx.fillText('艾伦·麦席森·图灵', textX, y);
+          y += 44 * 1.7 * S;
+          tctx.font = '900 ' + Math.round(40 * S) + 'px ' + serifHeavy;
+          tctx.fillText('1912 - 1954', textX, y);
+        } else {
+          // English: wrap word by word
+          tctx.font = Math.round(42 * S) + 'px ' + serifRegular;
+          const quote = 'We can only see a short distance ahead, but we can see plenty there that needs to be done.';
+          const words = quote.split(' ');
+          let line = '';
+          const lines = [];
+          for (let i = 0; i < words.length; i++) {
+            const trial = line ? line + ' ' + words[i] : words[i];
+            if (tctx.measureText(trial).width > maxWidth && line) {
+              lines.push(line);
+              line = words[i];
+            } else {
+              line = trial;
+            }
+          }
+          lines.push(line);
+          let y = oy + 330 * S;
+          for (let i = 0; i < lines.length; i++) {
+            tctx.fillText(lines[i], textX, y);
+            y += 42 * 1.48 * S;
+          }
+          y += 26 * S;
+          tctx.font = '900 ' + Math.round(35 * S) + 'px ' + serifHeavy;
+          tctx.fillText('ALAN MATHISON TURING', textX, y);
+          y += 35 * 1.7 * S;
+          tctx.font = '900 ' + Math.round(40 * S) + 'px ' + serifHeavy;
+          tctx.fillText('1912 - 1954', textX, y);
+        }
+      }
 
       function uploadLogoMask(rect, dpr, preset) {
         const maskPreset = preset || 'none';
@@ -1184,7 +1290,10 @@ void main() {
         lastHeroDpr = dpr;
         const width = Math.max(8, Math.round(rect.width * dpr));
         const height = Math.max(8, Math.round(rect.height * dpr));
-        if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === maskPreset) return;
+        if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === maskPreset) {
+          renderPortraitText();
+          return;
+        }
         const mask = document.createElement('canvas');
         mask.width = width;
         mask.height = height;
@@ -1276,6 +1385,7 @@ void main() {
         logoMaskWidth = width;
         logoMaskHeight = height;
         logoMaskPreset = maskPreset;
+        renderPortraitText();
       }
 
       let earthUploaded = false;
@@ -1325,10 +1435,20 @@ void main() {
           gl.useProgram(windProgram);
           gl.uniform4f(U.logoRect, rect.left, rect.top, rect.width, rect.height);
         }
+        renderPortraitText();
+      }
+
+      function setTextForPhase(phase) {
+        // Only the empty hero screen gets the text plate; conversations show
+        // the ASCII portrait alone so nothing competes with the reading column.
+        textAllowed = phase === 'hero';
+        renderPortraitText();
       }
 
       function setBackgroundVisible(visible) {
         canvas.style.visibility = visible ? '' : 'hidden';
+        if (!visible) textCanvas.style.display = 'none';
+        else renderPortraitText();
       }
 
       function setInk(rgb, alpha) {
@@ -1368,12 +1488,14 @@ void main() {
         setInk: setInk,
         setGlow: setGlow,
         setBackgroundVisible: setBackgroundVisible,
+        setTextForPhase: setTextForPhase,
         setHero: setHero,
         reloadHeroMask: reloadHeroMask,
         draw: draw,
         destroy: function () {
           gl.getExtension('WEBGL_lose_context')?.loseContext();
           canvas.remove();
+          textCanvas.remove();
         },
       };
     }
@@ -1665,7 +1787,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.2.0';
+        layer.canvas.dataset.version = '3.3.0';
 
         const touch = createTouch();
         let scheme = readScheme();
@@ -1969,6 +2091,10 @@ void main() {
             || preset === 'turingzh';
           // "none" hides the whole field; "smoke" is the original ambient code wind.
           layer.setBackgroundVisible(preset !== 'none');
+          // The crisp text plate is only safe on the empty hero screen; as soon
+          // as a conversation exists (chain-of-thought, answers) it is hidden so
+          // it can never compete with the reading column.
+          layer.setTextForPhase(phase);
           // Presets are drawn with a denser grid so the artwork stays crisp.
           const targetCell = next
             ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
