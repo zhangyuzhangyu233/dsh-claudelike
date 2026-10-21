@@ -10,7 +10,7 @@ Nine switchable code-art background presets for the **DeepSeek Harness** Web UI:
 - static earth-continent map, centred, without Antarctica
 
 Presets: ambient wind, none, DeepSeek whale, whale maid, chibi maid, 3D globe, earth-continent map,
-Alan Turing portrait (EN) and Alan Turing portrait (Chinese).
+a rotating computing-pioneers portrait preset (Turing, von Neumann, Shannon; English and Chinese).
 
 All presets share click-ripple dispersion, regional shimmer and live glyph animation.
 

@@ -14,7 +14,8 @@
  *
  * Build: `pnpm build` (esbuild -> ../client.js).
  */
-import { CHIBI_MASK_SRC, EARTH_MASK_SRC, LOGO_PATH, MAID_MASK_SRC, TURING_MASK_SRC,
+import { CHIBI_MASK_SRC, EARTH_MASK_SRC, SHANNON_MASK_SRC, SHANNON_ZH_MASK_SRC,
+  LOGO_PATH, MAID_MASK_SRC, NEUMANN_MASK_SRC, NEUMANN_ZH_MASK_SRC, TURING_MASK_SRC,
   TURING_ZH_MASK_SRC } from './generated/assets';
 import type { DshContext } from './types';
 
@@ -101,23 +102,28 @@ window.__ModuleLoader__.load({
       { key: 'whale', label: 'DeepSeek 鲸鱼' },
       { key: 'maid', label: '鲸鱼女仆' },
       { key: 'chibi', label: 'Q版鲸鱼女仆' },
-      { key: 'turing', label: '艾伦·图灵' },
-      { key: 'turingzh', label: '艾伦·图灵（中文）' },
+      { key: 'pioneers', label: '计算先驱' },
+      { key: 'pioneerszh', label: '计算先驱（中文）' },
       { key: 'earth', label: '立体地球' },
       { key: 'pan', label: '地球大陆' },
     ];
     const presetListeners = new Set<(hero: string, work: string) => void>();
     function normalizePreset(value) {
+      // Legacy single-portrait presets fold into the rotating pioneers preset.
+      if (value === 'turing' || value === 'neumann') return 'pioneers';
+      if (value === 'turingzh' || value === 'neumannzh') return 'pioneerszh';
       return value === 'maid' || value === 'chibi' || value === 'whale' || value === 'earth'
-        || value === 'pan' || value === 'turing' || value === 'turingzh' || value === 'smoke'
-        ? value : 'none';
+        || value === 'pan' || value === 'pioneers' || value === 'pioneerszh'
+        || value === 'smoke' ? value : 'none';
     }
     function readPreset(key) {
       try {
         const saved = window.localStorage.getItem(key);
+        if (saved === 'turing' || saved === 'neumann') return 'pioneers';
+        if (saved === 'turingzh' || saved === 'neumannzh') return 'pioneerszh';
         if (saved === 'maid' || saved === 'chibi' || saved === 'whale' || saved === 'earth'
-          || saved === 'pan' || saved === 'turing' || saved === 'turingzh' || saved === 'smoke'
-          || saved === 'none') return saved;
+          || saved === 'pan' || saved === 'pioneers' || saved === 'pioneerszh'
+          || saved === 'smoke' || saved === 'none') return saved;
       } catch (error) { /* ignore */ }
       return 'smoke';
     }
@@ -241,6 +247,90 @@ window.__ModuleLoader__.load({
         turingZhMask.waiters.length = 0;
       };
       image.src = TURING_ZH_MASK_SRC;
+    }
+
+    const neumannMask = { image: null, loading: false, waiters: [] };
+    function loadNeumannMask(callback) {
+      if (neumannMask.image) { callback(); return; }
+      neumannMask.waiters.push(callback);
+      if (neumannMask.loading) return;
+      neumannMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        neumannMask.image = image;
+        neumannMask.loading = false;
+        neumannMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        neumannMask.loading = false;
+        neumannMask.waiters.length = 0;
+      };
+      image.src = NEUMANN_MASK_SRC;
+    }
+
+    const neumannZhMask = { image: null, loading: false, waiters: [] };
+    function loadNeumannZhMask(callback) {
+      if (neumannZhMask.image) { callback(); return; }
+      neumannZhMask.waiters.push(callback);
+      if (neumannZhMask.loading) return;
+      neumannZhMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        neumannZhMask.image = image;
+        neumannZhMask.loading = false;
+        neumannZhMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        neumannZhMask.loading = false;
+        neumannZhMask.waiters.length = 0;
+      };
+      image.src = NEUMANN_ZH_MASK_SRC;
+    }
+
+    const shannonMask = { image: null, loading: false, waiters: [] };
+    function loadShannonMask(callback) {
+      if (shannonMask.image) { callback(); return; }
+      shannonMask.waiters.push(callback);
+      if (shannonMask.loading) return;
+      shannonMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        shannonMask.image = image;
+        shannonMask.loading = false;
+        shannonMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        shannonMask.loading = false;
+        shannonMask.waiters.length = 0;
+      };
+      image.src = SHANNON_MASK_SRC;
+    }
+
+    const shannonZhMask = { image: null, loading: false, waiters: [] };
+    function loadShannonZhMask(callback) {
+      if (shannonZhMask.image) { callback(); return; }
+      shannonZhMask.waiters.push(callback);
+      if (shannonZhMask.loading) return;
+      shannonZhMask.loading = true;
+      const image = new Image();
+      image.onload = function () {
+        shannonZhMask.image = image;
+        shannonZhMask.loading = false;
+        shannonZhMask.waiters.splice(0).forEach(function (fn) {
+          try { fn(); } catch (error) { /* ignore */ }
+        });
+      };
+      image.onerror = function () {
+        shannonZhMask.loading = false;
+        shannonZhMask.waiters.length = 0;
+      };
+      image.src = SHANNON_ZH_MASK_SRC;
     }
 
     const ATLAS_COLS = 16;
@@ -548,6 +638,8 @@ uniform float u_morph;
 uniform float u_hero;
 uniform float u_heroDetail;
 uniform float u_heroStill;
+uniform float u_heroFade;
+uniform float u_heroScale;
 uniform float u_heroEarth;
 uniform float u_heroPan;
 uniform highp sampler2D u_earth;
@@ -749,6 +841,8 @@ void main() {
   }
   if (u_hero > 0.5) {
     vec2 luv = (p - u_logoRect.xy) / u_logoRect.zw;
+    // Gentle zoom during the cross-fade: scales around the portrait centre.
+    luv = (luv - 0.5) / max(0.2, u_heroScale) + 0.5;
     // Click ripple disperses the mark: the mask lookup is pushed around and the
     // glyph field is perforated where the wave passes, then it reassembles as
     // the tap envelope decays.
@@ -788,7 +882,7 @@ void main() {
       heroStrength = 1.0 - (1.0 - heroStrength) * (1.0 - 0.95 * warm * smoothstep(-0.5, 0.25, hgrain));
     }
     float hshown = max(u_reveal, min(1.0, 2.0 * hand.w + warm));
-    o = vec4(heroStrength * hshown, 1.0, 0.5, hshown);
+    o = vec4(heroStrength * hshown * u_heroFade, 1.0, 0.5, hshown * u_heroFade);
     return;
   }
   vec2 e = (p - vec2(0.5 * u_paneCss.x, CARD_Y * u_paneCss.y)) / CALM;
@@ -1096,6 +1190,8 @@ void main() {
         hero: loc(windProgram, 'u_hero'),
         heroDetail: loc(windProgram, 'u_heroDetail'),
         heroStill: loc(windProgram, 'u_heroStill'),
+        heroFade: loc(windProgram, 'u_heroFade'),
+        heroScale: loc(windProgram, 'u_heroScale'),
         heroEarth: loc(windProgram, 'u_heroEarth'),
         heroPan: loc(windProgram, 'u_heroPan'),
         heroGlyph: loc(glyphProgram, 'u_hero'),
@@ -1179,6 +1275,9 @@ void main() {
       // 'hero' shows the mask with the baked quote/name/dates; anything else
       // (conversation) crops the mask down to the portrait only.
       let textPhase = 'hero';
+      let heroFade = 1;
+      let heroScale = 1;
+      let fadeAnim = null;
 
       function uploadLogoMask(rect, dpr, preset) {
         const maskPreset = preset || 'none';
@@ -1187,7 +1286,9 @@ void main() {
         lastHeroDpr = dpr;
         const width = Math.max(8, Math.round(rect.width * dpr));
         const height = Math.max(8, Math.round(rect.height * dpr));
-        const portraitVariant = maskPreset === 'turing' || maskPreset === 'turingzh';
+        const portraitVariant = maskPreset === 'turing' || maskPreset === 'turingzh'
+          || maskPreset === 'neumann' || maskPreset === 'neumannzh'
+          || maskPreset === 'shannon' || maskPreset === 'shannonzh';
         const cacheKey = maskPreset + (portraitVariant ? ':' + textPhase : '');
         if (width === logoMaskWidth && height === logoMaskHeight && logoMaskPreset === cacheKey) return;
         const mask = document.createElement('canvas');
@@ -1248,6 +1349,68 @@ void main() {
             return;
           }
           const image = turingZhMask.image;
+          const imageWidth = image.naturalWidth || image.width || 1;
+          const imageHeight = image.naturalHeight || image.height || 1;
+          const scale = Math.min(width / imageWidth, height / imageHeight);
+          if (textPhase === 'hero') {
+            ctx.drawImage(image, width - imageWidth * scale, height - imageHeight * scale,
+              imageWidth * scale, imageHeight * scale);
+          } else {
+            const s = 900 * scale;
+            ctx.drawImage(image, 600, 100, 900, 900, width - s, height - s, s, s);
+          }
+        } else if (maskPreset === 'neumann') {
+          if (!neumannMask.image) {
+            loadNeumannMask(function () {
+              logoMaskWidth = 0;
+              logoMaskHeight = 0;
+              if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
+            });
+            return;
+          }
+          const image = neumannMask.image;
+          const imageWidth = image.naturalWidth || image.width || 1;
+          const imageHeight = image.naturalHeight || image.height || 1;
+          const scale = Math.min(width / imageWidth, height / imageHeight);
+          if (textPhase === 'hero') {
+            ctx.drawImage(image, width - imageWidth * scale, height - imageHeight * scale,
+              imageWidth * scale, imageHeight * scale);
+          } else {
+            const s = 900 * scale;
+            ctx.drawImage(image, 600, 100, 900, 900, width - s, height - s, s, s);
+          }
+        } else if (maskPreset === 'neumannzh') {
+          if (!neumannZhMask.image) {
+            loadNeumannZhMask(function () {
+              logoMaskWidth = 0;
+              logoMaskHeight = 0;
+              if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
+            });
+            return;
+          }
+          const image = neumannZhMask.image;
+          const imageWidth = image.naturalWidth || image.width || 1;
+          const imageHeight = image.naturalHeight || image.height || 1;
+          const scale = Math.min(width / imageWidth, height / imageHeight);
+          if (textPhase === 'hero') {
+            ctx.drawImage(image, width - imageWidth * scale, height - imageHeight * scale,
+              imageWidth * scale, imageHeight * scale);
+          } else {
+            const s = 900 * scale;
+            ctx.drawImage(image, 600, 100, 900, 900, width - s, height - s, s, s);
+          }
+        } else if (maskPreset === 'shannon' || maskPreset === 'shannonzh') {
+          const zh = maskPreset === 'shannonzh';
+          const maskRef = zh ? shannonZhMask : shannonMask;
+          if (!maskRef.image) {
+            (zh ? loadShannonZhMask : loadShannonMask)(function () {
+              logoMaskWidth = 0;
+              logoMaskHeight = 0;
+              if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
+            });
+            return;
+          }
+          const image = maskRef.image;
           const imageWidth = image.naturalWidth || image.width || 1;
           const imageHeight = image.naturalHeight || image.height || 1;
           const scale = Math.min(width / imageWidth, height / imageHeight);
@@ -1320,6 +1483,23 @@ void main() {
         if (heroOn && lastHeroRect) uploadLogoMask(lastHeroRect, lastHeroDpr, lastUsedPreset);
       }
 
+      function startFadeSwap(onSwap) {
+        fadeAnim = {
+          start: performance.now(),
+          outMs: 320,
+          inMs: 380,
+          onSwap: onSwap,
+          swapped: false,
+        };
+        heroFade = 1;
+      }
+
+      function cancelHeroFade() {
+        fadeAnim = null;
+        heroFade = 1;
+        heroScale = 1;
+      }
+
       function setHero(active, rect, dpr, preset) {
         const maskPreset = active ? (preset || 'none') : 'none';
         lastUsedPreset = maskPreset;
@@ -1327,8 +1507,12 @@ void main() {
         gl.useProgram(windProgram);
         gl.uniform1f(U.hero, active ? 1 : 0);
         gl.uniform1f(U.heroDetail, maskPreset === 'maid' || maskPreset === 'chibi'
-          || maskPreset === 'turing' || maskPreset === 'turingzh' ? 1 : 0);
-        gl.uniform1f(U.heroStill, maskPreset === 'turing' || maskPreset === 'turingzh' ? 1 : 0);
+          || maskPreset === 'turing' || maskPreset === 'turingzh'
+          || maskPreset === 'neumann' || maskPreset === 'neumannzh'
+          || maskPreset === 'shannon' || maskPreset === 'shannonzh' ? 1 : 0);
+        gl.uniform1f(U.heroStill, maskPreset === 'turing' || maskPreset === 'turingzh'
+          || maskPreset === 'neumann' || maskPreset === 'neumannzh'
+          || maskPreset === 'shannon' || maskPreset === 'shannonzh' ? 1 : 0);
         gl.uniform1f(U.heroEarth, maskPreset === 'earth' ? 1 : 0);
         gl.uniform1f(U.heroPan, maskPreset === 'pan' ? 1 : 0);
         gl.useProgram(glyphProgram);
@@ -1362,6 +1546,32 @@ void main() {
         gl.useProgram(windProgram);
         gl.uniform1f(U.windTime, state.time);
         gl.uniform1f(U.reveal, state.reveal);
+        if (U.heroFade) {
+          if (fadeAnim !== null) {
+            const elapsed = performance.now() - fadeAnim.start;
+            if (elapsed < fadeAnim.outMs) {
+              heroFade = 1 - elapsed / fadeAnim.outMs;
+              heroScale = 1 + 0.06 * (elapsed / fadeAnim.outMs);
+            } else {
+              if (!fadeAnim.swapped) {
+                fadeAnim.swapped = true;
+                try { fadeAnim.onSwap(); } catch (error) { /* ignore */ }
+              }
+              const after = Math.min(1, (elapsed - fadeAnim.outMs) / fadeAnim.inMs);
+              heroFade = after;
+              heroScale = 1.06 - 0.06 * after;
+              if (after >= 1) {
+                fadeAnim = null;
+                heroScale = 1;
+              }
+            }
+          } else {
+            heroFade = 1;
+            heroScale = 1;
+          }
+          gl.uniform1f(U.heroFade, heroFade);
+          gl.uniform1f(U.heroScale, heroScale);
+        }
         setTouch(touchUniforms.wind, state.touch);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -1381,6 +1591,8 @@ void main() {
         setInk: setInk,
         setGlow: setGlow,
         setBackgroundVisible: setBackgroundVisible,
+        startFadeSwap: startFadeSwap,
+        cancelHeroFade: cancelHeroFade,
         setTextPhase: function (phase) {
           textPhase = phase === 'hero' ? 'hero' : 'active';
         },
@@ -1681,7 +1893,7 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.3.2';
+        layer.canvas.dataset.version = '3.5.0';
 
         const touch = createTouch();
         let scheme = readScheme();
@@ -1843,7 +2055,8 @@ void main() {
 
         function onVisibility() {
           if (document.hidden) {
-            if (raf) cancelAnimationFrame(raf);
+            stopPioneerRotation();
+          if (raf) cancelAnimationFrame(raf);
             raf = 0;
             if (timer) clearTimeout(timer);
             timer = 0;
@@ -1957,7 +2170,7 @@ void main() {
           const width = Math.max(1, host.clientWidth);
           const height = Math.max(1, host.clientHeight);
           if (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
-            || preset === 'turing' || preset === 'turingzh') {
+            || preset === 'pioneers' || preset === 'pioneerszh') {
             return { left: 0, top: 0, width: width, height: height };
           }
           const aspect = LOGO_VIEWBOX.width / LOGO_VIEWBOX.height;
@@ -1977,18 +2190,61 @@ void main() {
           applyBackground();
         };
         presetListeners.add(onPresetChange);
+        const PIONEER_EN = ['turing', 'neumann', 'shannon'];
+        const PIONEER_ZH = ['turingzh', 'neumannzh', 'shannonzh'];
+        const PIONEER_INTERVAL_MS = 11000;
+        const PIONEER_RIPPLE_DELAY_MS = 460;
+        let pioneerTimer = 0;
+        let pioneerToken = 0;
+        let pioneerKey = '';
+        let pioneerPhase = '';
+        let pioneerCurrent = '';
+
+        function stopPioneerRotation() {
+          pioneerToken += 1;
+          if (pioneerTimer) {
+            window.clearTimeout(pioneerTimer);
+            pioneerTimer = 0;
+          }
+          pioneerKey = '';
+          pioneerPhase = '';
+        }
+
+        function startPioneerRotation(frames, rect, dpr) {
+          const token = ++pioneerToken;
+          let index = 0;
+          function showCurrent() {
+            pioneerCurrent = frames[index % frames.length];
+            layer.setHero(true, rect, dpr, pioneerCurrent);
+            index += 1;
+          }
+          function scheduleNext() {
+            pioneerTimer = window.setTimeout(switchNext, PIONEER_INTERVAL_MS);
+          }
+          function switchNext() {
+            if (token !== pioneerToken) return;
+            layer.startFadeSwap(function () {
+              if (token !== pioneerToken) return;
+              showCurrent();
+            });
+            scheduleNext();
+          }
+          showCurrent();
+          scheduleNext();
+        }
+
         function applyBackground() {
           const phase = currentConversationPhase();
           const preset = presetForPhase(phase);
           const next = preset === 'whale' || preset === 'maid' || preset === 'chibi'
-            || preset === 'earth' || preset === 'pan' || preset === 'turing'
-            || preset === 'turingzh';
+            || preset === 'earth' || preset === 'pan'
+            || preset === 'pioneers' || preset === 'pioneerszh';
           // "none" hides the whole field; "smoke" is the original ambient code wind.
           layer.setBackgroundVisible(preset !== 'none');
           // Presets are drawn with a denser grid so the artwork stays crisp.
           const targetCell = next
             ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
-              || preset === 'turing' || preset === 'turingzh' ? 4.5 : 5.0)
+              || preset === 'pioneers' || preset === 'pioneerszh' ? 4.5 : 5.0)
             : BASE_CELL_CSS;
           if (CONFIG.grid.cellCss !== targetCell) {
             CONFIG.grid.cellCss = targetCell;
@@ -1998,7 +2254,29 @@ void main() {
           CONFIG.power.frameMs = preset === 'earth' ? 16 : BASE_FRAME_MS;
           layer.setTextPhase(phase === 'hero' ? 'hero' : 'active');
           const rect = next ? computeBackgroundRect(preset) : null;
-          layer.setHero(next, rect, window.devicePixelRatio || 1, preset);
+          const pioneerFrames = preset === 'pioneers'
+            ? PIONEER_EN
+            : (preset === 'pioneerszh' ? PIONEER_ZH : null);
+          if (pioneerFrames !== null && rect !== null) {
+            const key = preset + '|' + rect.width + 'x' + rect.height;
+            if (key !== pioneerKey) {
+              stopPioneerRotation();
+              pioneerKey = key;
+              pioneerPhase = phase;
+              startPioneerRotation(pioneerFrames, rect, window.devicePixelRatio || 1);
+            } else if (pioneerPhase !== phase) {
+              // Phase switch (hero <-> conversation): keep the rotation index
+              // and just re-upload the current portrait with the new text crop.
+              pioneerPhase = phase;
+              if (pioneerCurrent) {
+                layer.setHero(true, rect, window.devicePixelRatio || 1, pioneerCurrent);
+              }
+            }
+          } else {
+            stopPioneerRotation();
+            layer.cancelHeroFade();
+            layer.setHero(next, rect, window.devicePixelRatio || 1, preset);
+          }
           backgroundActive = next;
           schedule();
         }
