@@ -68,7 +68,21 @@ window.__ModuleLoader__.load({
       touch: { stir: 1, ripple: 1, slowPxS: 60, fastPxS: 800 },
       composition: { card: { centerY: 0.45, calmX: 250, calmY: 80, left: 0.3 } },
       grid: { cellCss: 6.5, minCols: 24, minRows: 8, maxDevicePixels: 21e6 },
-      power: { frameMs: 40, rippleFrameMs: 10, resizeSettleMs: 150 },
+      power: { frameMs: 40, rippleFrameMs: 10, flowFrameMs: 16, resizeSettleMs: 150 },
+      // 主机纽带 flow: a periodic swell plus a random drift; while an agent task
+      // runs the plates race, then they flatten when it ends and resume shortly.
+      flow: {
+        min: 0.12,
+        max: 3.4,
+        fast: 14,
+        rateMax: 40,
+        charsPerToken: 2.4,
+        smooth: 0.45,
+        coast: 2.8,
+        settle: 1.8,
+        hold: 2.2,
+        resume: 3,
+      },
     };
 
     /** Every printable ASCII character plus a middle dot: 96 atlas cells. */
@@ -97,13 +111,14 @@ window.__ModuleLoader__.load({
     const HERO_PRESET_KEY = 'dsh-code-ripple-hero-preset';
     const WORK_PRESET_KEY = 'dsh-code-ripple-work-preset';
     const HERO_PRESETS = [
-      { key: 'smoke', label: '（默认）' },
+      { key: 'smoke', label: 'Claude' },
       { key: 'none', label: '无背景' },
       { key: 'whale', label: 'DeepSeek 鲸鱼' },
       { key: 'maid', label: '鲸鱼女仆' },
       { key: 'chibi', label: 'Q版鲸鱼女仆' },
       { key: 'pioneers', label: '计算先驱' },
       { key: 'pioneerszh', label: '计算先驱（中文）' },
+      { key: 'console', label: '主机纽带' },
       { key: 'earth', label: '立体地球' },
       { key: 'pan', label: '地球大陆' },
     ];
@@ -114,7 +129,7 @@ window.__ModuleLoader__.load({
       if (value === 'turingzh' || value === 'neumannzh') return 'pioneerszh';
       return value === 'maid' || value === 'chibi' || value === 'whale' || value === 'earth'
         || value === 'pan' || value === 'pioneers' || value === 'pioneerszh'
-        || value === 'smoke' ? value : 'none';
+        || value === 'console' || value === 'smoke' ? value : 'none';
     }
     function readPreset(key) {
       try {
@@ -123,9 +138,9 @@ window.__ModuleLoader__.load({
         if (saved === 'turingzh' || saved === 'neumannzh') return 'pioneerszh';
         if (saved === 'maid' || saved === 'chibi' || saved === 'whale' || saved === 'earth'
           || saved === 'pan' || saved === 'pioneers' || saved === 'pioneerszh'
-          || saved === 'smoke' || saved === 'none') return saved;
+          || saved === 'console' || saved === 'smoke' || saved === 'none') return saved;
       } catch (error) { /* ignore */ }
-      return 'smoke';
+      return 'console';
     }
     let heroPreset = readPreset(HERO_PRESET_KEY);
     let workPreset = readPreset(WORK_PRESET_KEY);
@@ -642,6 +657,9 @@ uniform float u_heroFade;
 uniform float u_heroScale;
 uniform float u_heroEarth;
 uniform float u_heroPan;
+uniform float u_heroConsole;
+uniform float u_flow;
+uniform float u_amp;
 uniform highp sampler2D u_earth;
 uniform highp sampler2D u_logo;
 uniform vec4 u_logoRect;
@@ -837,6 +855,47 @@ void main() {
     }
     float hshown = max(u_reveal, min(1.0, 2.0 * hand.w + warm));
     o = vec4(heroStrength * hshown, 1.0, 0.5, hshown);
+    return;
+  }
+  if (u_heroConsole > 0.5) {
+    // PS4 CD-plate: three translucent sheets drawn as code glyphs through the
+    // engine's own field. The Claude-reverse-engineered taps/wakes are applied
+    // here exactly like the other hero fields, so the click ripple is native.
+    vec2 pane = max(u_paneCss, vec2(1.0));
+    float ripple = clamp(abs(hand.z) * 0.55 + hand.w * 0.35 + warm * 0.40, 0.0, 1.0);
+    vec2 jitter = vec2(
+      noise(vec3(p * 0.012, u_time * 2.6), 0x61u),
+      noise(vec3(p * 0.012 + vec2(7.7, 2.0), u_time * 2.6 + 2.0), 0x62u)) - 0.5;
+    vec2 pp = p + (hand.xy * 0.30 + jitter * (10.0 + 46.0 * ripple)) * ripple;
+    vec2 s = clamp(pp / pane, vec2(0.0), vec2(1.0));
+    float x = s.x;
+    float energy = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float k = float(i);
+      float phase = u_flow*0.085;
+      float waveCenter = 0.115*sin(x*4.1-phase)
+        + 0.055*sin(x*2.4+phase*0.67)
+        + (k-1.0)*0.064*sin(x*3.7-phase*0.55+0.8)
+        + 0.025*sin(x*6.0+phase*0.40+k*1.6);
+      float flatCenter = (k-1.0)*0.064;
+      float center = 0.59 + mix(flatCenter, waveCenter, u_amp);
+      float turn = mix(0.5, 0.5+0.5*sin(x*4.7-phase*0.61+k*1.65), u_amp);
+      float width = 0.018+0.082*turn*turn+k*0.008;
+      float d = s.y - center;
+      float across = d/width;
+      float body = 1.0-smoothstep(0.72, 1.08, abs(across));
+      float facing = 0.5+0.5*cos(x*3.0-phase*0.35+k*1.9);
+      float rimU = exp(-pow((across+0.78)/0.20, 2.0)) * (0.23+0.19*facing);
+      float rimL = exp(-pow((across-0.84)/0.22, 2.0)) * (0.08+0.06*(1.0-facing));
+      float depth = 1.0-k*0.22;
+      energy += (body*(0.10+0.09*facing) + rimU + rimL)*depth;
+    }
+    energy = 1.0 - exp(-energy*3.2);
+    float holes = noise(vec3(p / 24.0, u_time * 2.2), 0x63u);
+    energy *= 1.0 - 0.90 * ripple * smoothstep(0.10, 0.55, holes);
+    energy += hand.z * 0.6 + warm * 0.35;
+    float seen = max(u_reveal, min(1.0, 2.0 * hand.w + warm));
+    o = vec4(clamp(energy, 0.0, 1.6) * seen, 1.0, 0.5, 1.0);
     return;
   }
   if (u_hero > 0.5) {
@@ -1129,6 +1188,7 @@ void main() {
       gl.uniform1i(loc(windProgram, 'u_earth'), UNITS.earth);
       gl.uniform1f(loc(windProgram, 'u_hero'), 0);
       gl.uniform1f(loc(windProgram, 'u_heroEarth'), 0);
+      gl.uniform1f(loc(windProgram, 'u_heroConsole'), 0);
       gl.uniform1f(loc(windProgram, 'u_heroPan'), 0);
 
       gl.useProgram(glyphProgram);
@@ -1179,6 +1239,8 @@ void main() {
         originCss: loc(windProgram, 'u_originCss'),
         paneCss: loc(windProgram, 'u_paneCss'),
         canvasCss: loc(windProgram, 'u_canvasCss'),
+        flow: loc(windProgram, 'u_flow'),
+        amp: loc(windProgram, 'u_amp'),
         glyphTime: loc(glyphProgram, 'u_time'),
         count: loc(glyphProgram, 'u_count'),
         grid: loc(glyphProgram, 'u_grid'),
@@ -1193,6 +1255,7 @@ void main() {
         heroFade: loc(windProgram, 'u_heroFade'),
         heroScale: loc(windProgram, 'u_heroScale'),
         heroEarth: loc(windProgram, 'u_heroEarth'),
+        heroConsole: loc(windProgram, 'u_heroConsole'),
         heroPan: loc(windProgram, 'u_heroPan'),
         heroGlyph: loc(glyphProgram, 'u_hero'),
         logoRect: loc(windProgram, 'u_logoRect'),
@@ -1514,6 +1577,7 @@ void main() {
           || maskPreset === 'neumann' || maskPreset === 'neumannzh'
           || maskPreset === 'shannon' || maskPreset === 'shannonzh' ? 1 : 0);
         gl.uniform1f(U.heroEarth, maskPreset === 'earth' ? 1 : 0);
+        gl.uniform1f(U.heroConsole, maskPreset === 'console' ? 1 : 0);
         gl.uniform1f(U.heroPan, maskPreset === 'pan' ? 1 : 0);
         gl.useProgram(glyphProgram);
         gl.uniform1f(U.heroGlyph, active ? 1 : 0);
@@ -1545,6 +1609,8 @@ void main() {
         gl.viewport(0, 0, columns, rows * 2);
         gl.useProgram(windProgram);
         gl.uniform1f(U.windTime, state.time);
+        gl.uniform1f(U.flow, typeof state.flow === 'number' ? state.flow : state.time);
+        gl.uniform1f(U.amp, typeof state.amp === 'number' ? state.amp : 1);
         gl.uniform1f(U.reveal, state.reveal);
         if (U.heroFade) {
           if (fadeAnim !== null) {
@@ -1777,8 +1843,67 @@ void main() {
 
     // --------------------------------------------------------------- component
 
-    function CodeRippleBackground() {
+    // Set by the slot hooks (see CodeRippleBackground) and polled by the
+    // animation loop, so a status change does not need a React re-render.
+    let taskRunning = false;
+    // Human-facing agent mood: idle / working / waiting for input, plus a short
+    // red pulse whenever a turn fails (lastAgentError changes).
+    let agentMood = 'idle';
+    let agentErrorAt = 0;
+    let lastAgentErrorSeen = '';
+
+    function isAnyTaskRunning(statuses: any, sessions: any) {
+      let active = false;
+      if (statuses && typeof statuses.forEach === 'function') {
+        statuses.forEach(function (status: any) {
+          if (status && status.running === true) active = true;
+        });
+      }
+      if (!active && sessions && sessions.byId) {
+        const ids = Object.keys(sessions.byId);
+        for (let i = 0; i < ids.length; i += 1) {
+          const session = sessions.byId[ids[i]];
+          if (session && session.running === true) active = true;
+        }
+      }
+      return active;
+    }
+
+    function CodeRippleBackground(props: any) {
       const hostRef = React.useRef(null);
+
+      // shell.overlay composes DSH's standard session hooks, so the background
+      // knows when an agent task is running (spinner) or has just finished.
+      const useSessionStatus = props && props.useSessionStatus;
+      const useSessions = props && props.useSessions;
+      const statuses = useSessionStatus ? useSessionStatus((snapshot: any) => snapshot) : null;
+      const sessions = useSessions ? useSessions((snapshot: any) => snapshot) : null;
+      React.useEffect(() => {
+        let runningNow = false;
+        let waitingNow = false;
+        if (statuses && typeof statuses.forEach === 'function') {
+          statuses.forEach(function (status: any) {
+            if (!status) return;
+            if (status.running === true) runningNow = true;
+            if (status.pendingInteraction) waitingNow = true;
+          });
+        }
+        if (sessions && sessions.byId) {
+          const ids = Object.keys(sessions.byId);
+          for (let i = 0; i < ids.length; i += 1) {
+            const session = sessions.byId[ids[i]];
+            if (!session) continue;
+            if (session.running === true) runningNow = true;
+            const failure = session.lastAgentError;
+            if (typeof failure === 'string' && failure.length > 0 && failure !== lastAgentErrorSeen) {
+              lastAgentErrorSeen = failure;
+              agentErrorAt = performance.now();
+            }
+          }
+        }
+        taskRunning = runningNow;
+        agentMood = waitingNow ? 'waiting' : (runningNow ? 'working' : 'idle');
+      }, [statuses, sessions]);
 
       React.useEffect(() => {
         const anchor = hostRef.current;
@@ -1893,7 +2018,49 @@ void main() {
         rememberLook(params.key);
         host.dataset.landingTexture = 'canvas';
         layer.canvas.dataset.look = params.key + '/' + params.seed.toString(16);
-        layer.canvas.dataset.version = '3.5.0';
+        layer.canvas.dataset.version = '3.7.0';
+
+        // Live tokens/s proxy: count characters that stream into the conversation
+        // text (characterData growth only, so sending a message or a tool result
+        // popping in is not mistaken for model output).
+        let streamChars = 0;
+        let streamRate = 0;
+        let streamSample = 0;
+        const streamObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(function (records) {
+          for (let i = 0; i < records.length; i += 1) {
+            const record = records[i];
+            if (record.type === 'characterData') {
+              const target = record.target;
+              const element = (target && (target.nodeType === 1 ? target : target.parentElement)) as Element | null;
+              if (!element || !element.closest) continue;
+              if (!element.closest('[data-slot="conversation.content"], [data-conversation-scroll], [data-slot="conversation.session"]')) continue;
+              const next = target.nodeValue ? target.nodeValue.length : 0;
+              const previous = record.oldValue ? record.oldValue.length : 0;
+              if (next > previous) streamChars += next - previous;
+              continue;
+            }
+            if (record.type !== 'childList') continue;
+            for (let n = 0; n < record.addedNodes.length; n += 1) {
+              const node = record.addedNodes[n];
+              const element = node && node.parentElement;
+              if (!element || !element.closest) continue;
+              if (element.closest('[data-slot*="composer"], textarea, input, [contenteditable="true"]')) continue;
+              if (!element.closest('[data-slot="conversation.content"], [data-conversation-scroll], [data-slot="conversation.session"]')) continue;
+              const text = node.textContent || '';
+              // Streaming renders small chunks; skip whole big blocks (a sent
+              // message or a settled paragraph appearing at once).
+              if (text.length > 0 && text.length <= 200) streamChars += text.length;
+            }
+          }
+        }) : null;
+        if (streamObserver) {
+          streamObserver.observe(centerCol, {
+            subtree: true,
+            childList: true,
+            characterData: true,
+            characterDataOldValue: true,
+          });
+        }
 
         const touch = createTouch();
         let scheme = readScheme();
@@ -1951,6 +2118,24 @@ void main() {
         let resizeTimer = 0;
         let grid = null;
 
+        // 主机纽带 flow state: periodic swell + random drift, overridden while a
+        // task runs; after it ends the plates flatten, hold, then resume.
+        let flowTime = 0;
+        let flowSpeed = 1;
+        let flowCoastFrom = 1;
+        let waitMix = 0;
+        let errorMix = 0;
+        let activePreset = 'none';
+        let flowPeriod = 18 + Math.random() * 18;
+        let flowPhase = Math.random() * Math.PI * 2;
+        let flowRandFrom = 0.3 + Math.random() * 0.4;
+        let flowRandTo = Math.random();
+        let flowRandStart = 0;
+        let flowRandDur = 6 + Math.random() * 6;
+        let flowAmp = 1;
+        let taskWasRunning = false;
+        let taskEndAt = -1;
+
         function measure() {
           host.style.top = '0px';
           host.style.height = '100%';
@@ -1978,10 +2163,17 @@ void main() {
           timer = 0;
           if (!running || document.hidden) return;
           const busy = touch.busy(clock);
+          const flowing = streamRate > 6
+            || flowAmp < 0.999
+            || flowSpeed > 1.6
+            || flowSpeed < 0.4;
+          const frameMs = busy
+            ? CONFIG.power.rippleFrameMs
+            : (flowing ? CONFIG.power.flowFrameMs : CONFIG.power.frameMs);
           timer = setTimeout(function () {
             timer = 0;
             raf = requestAnimationFrame(frame);
-          }, busy ? CONFIG.power.rippleFrameMs : CONFIG.power.frameMs);
+          }, frameMs);
         }
 
         function frame(now) {
@@ -1989,10 +2181,135 @@ void main() {
           const dt = Math.min(Math.max(now - before, 0), 250);
           before = now;
           clock += dt / 1000;
+          const dtSec = dt / 1000;
+          const running = taskRunning;
+
+          // Sample streamed characters a few times a second and turn them into an
+          // approximate tokens/second figure (rises fast, falls slowly). The flow
+          // speed rides this rate: a task that is only thinking or running tools
+          // streams nothing, so the plates do NOT speed up on their own.
+          streamSample += dtSec;
+          if (streamSample >= 0.2) {
+            const charsPerSecond = streamChars / streamSample;
+            streamChars = 0;
+            streamSample = 0;
+            const tokensPerSecond = charsPerSecond / CONFIG.flow.charsPerToken;
+            const blend = tokensPerSecond > streamRate ? 0.55 : 0.18;
+            streamRate += (tokensPerSecond - streamRate) * blend;
+            if (streamRate < 0.1) streamRate = 0;
+          } else {
+            streamRate *= Math.max(0, 1 - dtSec / 1.2);
+          }
+
+          // Post-task timeline: coast down first (no hard stop), then flatten,
+          // hold the plates flat, and finally wake the flow up again.
+          const coast = CONFIG.flow.coast;
+          if (running) {
+            taskEndAt = -1;
+            flowAmp += (1 - flowAmp) * Math.min(1, dtSec / 0.35);
+          } else if (taskWasRunning) {
+            taskEndAt = clock;
+            flowCoastFrom = Math.max(flowSpeed, 1.5);
+          } else if (taskEndAt >= 0) {
+            const since = clock - taskEndAt;
+            if (since < coast) {
+              flowAmp = 1;
+            } else if (since < coast + CONFIG.flow.settle) {
+              flowAmp = 1 - smoothstep((since - coast) / CONFIG.flow.settle);
+            } else if (since < coast + CONFIG.flow.settle + CONFIG.flow.hold) {
+              flowAmp = 0;
+            } else {
+              flowAmp = smoothstep(
+                (since - coast - CONFIG.flow.settle - CONFIG.flow.hold) / CONFIG.flow.resume,
+              );
+            }
+          } else {
+            flowAmp = 1;
+          }
+          taskWasRunning = running;
+
+          // Periodic swell + smooth random drift → base speed.
+          if (clock > flowRandStart + flowRandDur) {
+            flowRandFrom = flowRandTo;
+            flowRandTo = Math.random();
+            flowRandStart = clock;
+            flowRandDur = 6 + Math.random() * 7;
+          }
+          const drift = flowRandFrom
+            + (flowRandTo - flowRandFrom) * smoothstep((clock - flowRandStart) / flowRandDur);
+          const swell = 0.5 + 0.5 * Math.sin((clock * Math.PI * 2) / flowPeriod + flowPhase);
+          const speed01 = 0.5 * swell + 0.5 * drift;
+          const baseSpeed = CONFIG.flow.min
+            + (CONFIG.flow.max - CONFIG.flow.min) * Math.pow(speed01, 1.35);
+
+          let flowTarget: number;
+          if (running) {
+            const boost = Math.min(1, Math.pow(streamRate / CONFIG.flow.rateMax, 0.9));
+            flowTarget = baseSpeed + (CONFIG.flow.fast - baseSpeed) * boost;
+          } else if (taskEndAt >= 0) {
+            const coastEase = smoothstep(Math.min(1, (clock - taskEndAt) / coast));
+            if (clock - taskEndAt < coast) {
+              // Momentum keeps its speed at first, then it eases off: the
+              // deceleration starts at zero, so it coasts instead of braking.
+              flowTarget = baseSpeed + (flowCoastFrom - baseSpeed) * (1 - coastEase);
+            } else if (flowAmp > 0) {
+              // Flattening / still moving: let the remaining speed fade with the
+              // plates, then wake up from almost nothing.
+              flowTarget = baseSpeed * (0.3 + 0.7 * flowAmp);
+            } else {
+              flowTarget = baseSpeed * 0.3;
+            }
+          } else {
+            flowTarget = baseSpeed;
+          }
+          flowSpeed += (flowTarget - flowSpeed) * Math.min(1, dtSec / CONFIG.flow.smooth);
+          flowTime += dtSec * flowSpeed;
+
           if (!start) start = clock;
           reveal = smoothstep((clock - start) / CONFIG.wind.revealS);
           layer.canvas.style.opacity = String(strength);
-          layer.draw({ time: clock * CONFIG.wind.energy, reveal: reveal, touch: touch.frame(clock, host.clientWidth) });
+
+          // Mood over the ribbon ink: warm breathing while the agent waits for a
+          // reply, a short red pulse when a turn fails. Both ease in and out.
+          const nowMs = performance.now();
+          const errorActive = nowMs - agentErrorAt < 4200;
+          const waitActive = !errorActive && agentMood === 'waiting';
+          waitMix += ((waitActive ? 1 : 0) - waitMix) * Math.min(1, dtSec / 0.8);
+          errorMix += ((errorActive ? 1 : 0) - errorMix) * Math.min(1, dtSec / 0.45);
+          const breath = 0.5 + 0.5 * Math.sin((clock * Math.PI * 2) / (errorActive ? 0.9 : 3.2));
+          const warm = waitMix * (0.45 + 0.25 * breath);
+          const bad = errorMix * (0.6 + 0.35 * breath);
+          const glowBase = CONFIG.glow.color[scheme];
+          let inkR = ink.rgb[0];
+          let inkG = ink.rgb[1];
+          let inkB = ink.rgb[2];
+          let glowR = glowBase[0];
+          let glowG = glowBase[1];
+          let glowB = glowBase[2];
+          inkR += (1.0 - inkR) * warm;
+          inkG += (0.79 - inkG) * warm;
+          inkB += (0.5 - inkB) * warm;
+          glowR += (1.0 - glowR) * warm;
+          glowG += (0.6 - glowG) * warm;
+          glowB += (0.24 - glowB) * warm;
+          inkR += (1.0 - inkR) * bad;
+          inkG += (0.55 - inkG) * bad;
+          inkB += (0.5 - inkB) * bad;
+          glowR += (1.0 - glowR) * bad;
+          glowG += (0.32 - glowG) * bad;
+          glowB += (0.3 - glowB) * bad;
+          if (activePreset === 'console') {
+            layer.setInk([inkR, inkG, inkB], ink.alpha);
+            layer.setGlow([glowR, glowG, glowB]);
+          }
+
+          layer.draw({
+            time: clock * CONFIG.wind.energy,
+            reveal: reveal,
+            touch: touch.frame(clock, host.clientWidth),
+            flow: flowTime,
+            amp: flowAmp * (1 - 0.28 * Math.min(1, Math.max(0, (flowSpeed - 3) / (CONFIG.flow.fast - 3)))),
+          });
           schedule();
         }
 
@@ -2170,7 +2487,7 @@ void main() {
           const width = Math.max(1, host.clientWidth);
           const height = Math.max(1, host.clientHeight);
           if (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
-            || preset === 'pioneers' || preset === 'pioneerszh') {
+            || preset === 'pioneers' || preset === 'pioneerszh' || preset === 'console') {
             return { left: 0, top: 0, width: width, height: height };
           }
           const aspect = LOGO_VIEWBOX.width / LOGO_VIEWBOX.height;
@@ -2193,12 +2510,17 @@ void main() {
         const PIONEER_EN = ['turing', 'neumann', 'shannon'];
         const PIONEER_ZH = ['turingzh', 'neumannzh', 'shannonzh'];
         const PIONEER_INTERVAL_MS = 11000;
-        const PIONEER_RIPPLE_DELAY_MS = 460;
+        // One rotation state shared by the hero and conversation phases and by
+        // both languages: switching phase / language / panel size must never
+        // restart the clock or the rotation index.
         let pioneerTimer = 0;
         let pioneerToken = 0;
-        let pioneerKey = '';
-        let pioneerPhase = '';
+        let pioneerFamily = '';
+        let pioneerFrames = null;
+        let pioneerIndex = 0;
         let pioneerCurrent = '';
+        let pioneerRect = null;
+        let pioneerDpr = 1;
 
         function stopPioneerRotation() {
           pioneerToken += 1;
@@ -2206,45 +2528,53 @@ void main() {
             window.clearTimeout(pioneerTimer);
             pioneerTimer = 0;
           }
-          pioneerKey = '';
-          pioneerPhase = '';
+          pioneerFamily = '';
+          pioneerFrames = null;
         }
 
-        function startPioneerRotation(frames, rect, dpr) {
-          const token = ++pioneerToken;
-          let index = 0;
-          function showCurrent() {
-            pioneerCurrent = frames[index % frames.length];
-            layer.setHero(true, rect, dpr, pioneerCurrent);
-            index += 1;
-          }
-          function scheduleNext() {
-            pioneerTimer = window.setTimeout(switchNext, PIONEER_INTERVAL_MS);
-          }
-          function switchNext() {
+        function showPioneerCurrent() {
+          if (pioneerFrames === null || pioneerRect === null) return;
+          const index = ((pioneerIndex % pioneerFrames.length) + pioneerFrames.length) % pioneerFrames.length;
+          pioneerCurrent = pioneerFrames[index];
+          layer.setHero(true, pioneerRect, pioneerDpr, pioneerCurrent);
+        }
+
+        function switchPioneer() {
+          const token = pioneerToken;
+          layer.startFadeSwap(function () {
             if (token !== pioneerToken) return;
-            layer.startFadeSwap(function () {
-              if (token !== pioneerToken) return;
-              showCurrent();
-            });
-            scheduleNext();
-          }
-          showCurrent();
-          scheduleNext();
+            pioneerIndex += 1;
+            showPioneerCurrent();
+          });
+          pioneerTimer = window.setTimeout(switchPioneer, PIONEER_INTERVAL_MS);
+        }
+
+        function startPioneerRotation(family, frames, rect, dpr) {
+          pioneerToken += 1;
+          pioneerFamily = family;
+          pioneerFrames = frames;
+          pioneerIndex = 0;
+          pioneerRect = rect;
+          pioneerDpr = dpr;
+          showPioneerCurrent();
+          if (pioneerTimer) window.clearTimeout(pioneerTimer);
+          pioneerTimer = window.setTimeout(switchPioneer, PIONEER_INTERVAL_MS);
         }
 
         function applyBackground() {
           const phase = currentConversationPhase();
           const preset = presetForPhase(phase);
+          activePreset = preset;
           const next = preset === 'whale' || preset === 'maid' || preset === 'chibi'
-            || preset === 'earth' || preset === 'pan'
+            || preset === 'earth' || preset === 'pan' || preset === 'console'
             || preset === 'pioneers' || preset === 'pioneerszh';
           // "none" hides the whole field; "smoke" is the original ambient code wind.
           layer.setBackgroundVisible(preset !== 'none');
           // Presets are drawn with a denser grid so the artwork stays crisp.
           const targetCell = next
             ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
-              || preset === 'pioneers' || preset === 'pioneerszh' ? 4.5 : 5.0)
+              || preset === 'pioneers' || preset === 'pioneerszh'
+              || preset === 'console' ? 4.5 : 5.0)
             : BASE_CELL_CSS;
           if (CONFIG.grid.cellCss !== targetCell) {
             CONFIG.grid.cellCss = targetCell;
@@ -2253,24 +2583,23 @@ void main() {
           // The spinning globe needs a smoother cadence than the ambient field.
           CONFIG.power.frameMs = preset === 'earth' ? 16 : BASE_FRAME_MS;
           layer.setTextPhase(phase === 'hero' ? 'hero' : 'active');
+          layer.setInk(ink.rgb, ink.alpha);
+          layer.setGlow(CONFIG.glow.color[scheme]);
           const rect = next ? computeBackgroundRect(preset) : null;
-          const pioneerFrames = preset === 'pioneers'
-            ? PIONEER_EN
-            : (preset === 'pioneerszh' ? PIONEER_ZH : null);
-          if (pioneerFrames !== null && rect !== null) {
-            const key = preset + '|' + rect.width + 'x' + rect.height;
-            if (key !== pioneerKey) {
+          const familyNow = preset === 'pioneers' || preset === 'pioneerszh' ? 'pioneers' : '';
+          const framesNow = preset === 'pioneerszh' ? PIONEER_ZH : PIONEER_EN;
+          if (familyNow !== '' && rect !== null) {
+            const dpr = window.devicePixelRatio || 1;
+            if (familyNow !== pioneerFamily) {
               stopPioneerRotation();
-              pioneerKey = key;
-              pioneerPhase = phase;
-              startPioneerRotation(pioneerFrames, rect, window.devicePixelRatio || 1);
-            } else if (pioneerPhase !== phase) {
-              // Phase switch (hero <-> conversation): keep the rotation index
-              // and just re-upload the current portrait with the new text crop.
-              pioneerPhase = phase;
-              if (pioneerCurrent) {
-                layer.setHero(true, rect, window.devicePixelRatio || 1, pioneerCurrent);
-              }
+              startPioneerRotation(familyNow, framesNow, rect, dpr);
+            } else {
+              // Same family: refresh geometry / language only, never the clock
+              // or the index. Re-uploading hits the mask cache when unchanged.
+              pioneerRect = rect;
+              pioneerDpr = dpr;
+              pioneerFrames = framesNow;
+              showPioneerCurrent();
             }
           } else {
             stopPioneerRotation();
@@ -2369,6 +2698,7 @@ void main() {
           if (themeTimer) clearTimeout(themeTimer);
           if (frameObserver) frameObserver.disconnect();
           if (childObserver) childObserver.disconnect();
+          if (streamObserver) streamObserver.disconnect();
           if (sidebarObserver) sidebarObserver.disconnect();
           if (resizeObserver) resizeObserver.disconnect();
           presetListeners.delete(onPresetChange);

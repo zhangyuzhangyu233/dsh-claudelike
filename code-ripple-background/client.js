@@ -49,7 +49,21 @@
         touch: { stir: 1, ripple: 1, slowPxS: 60, fastPxS: 800 },
         composition: { card: { centerY: 0.45, calmX: 250, calmY: 80, left: 0.3 } },
         grid: { cellCss: 6.5, minCols: 24, minRows: 8, maxDevicePixels: 21e6 },
-        power: { frameMs: 40, rippleFrameMs: 10, resizeSettleMs: 150 }
+        power: { frameMs: 40, rippleFrameMs: 10, flowFrameMs: 16, resizeSettleMs: 150 },
+        // 主机纽带 flow: a periodic swell plus a random drift; while an agent task
+        // runs the plates race, then they flatten when it ends and resume shortly.
+        flow: {
+          min: 0.12,
+          max: 3.4,
+          fast: 14,
+          rateMax: 40,
+          charsPerToken: 2.4,
+          smooth: 0.45,
+          coast: 2.8,
+          settle: 1.8,
+          hold: 2.2,
+          resume: 3
+        }
       };
       const GLYPHS = (function() {
         const chars = [];
@@ -66,13 +80,14 @@
       const HERO_PRESET_KEY = "dsh-code-ripple-hero-preset";
       const WORK_PRESET_KEY = "dsh-code-ripple-work-preset";
       const HERO_PRESETS = [
-        { key: "smoke", label: "\uFF08\u9ED8\u8BA4\uFF09" },
+        { key: "smoke", label: "Claude" },
         { key: "none", label: "\u65E0\u80CC\u666F" },
         { key: "whale", label: "DeepSeek \u9CB8\u9C7C" },
         { key: "maid", label: "\u9CB8\u9C7C\u5973\u4EC6" },
         { key: "chibi", label: "Q\u7248\u9CB8\u9C7C\u5973\u4EC6" },
         { key: "pioneers", label: "\u8BA1\u7B97\u5148\u9A71" },
         { key: "pioneerszh", label: "\u8BA1\u7B97\u5148\u9A71\uFF08\u4E2D\u6587\uFF09" },
+        { key: "console", label: "\u4E3B\u673A\u7EBD\u5E26" },
         { key: "earth", label: "\u7ACB\u4F53\u5730\u7403" },
         { key: "pan", label: "\u5730\u7403\u5927\u9646" }
       ];
@@ -80,17 +95,17 @@
       function normalizePreset(value) {
         if (value === "turing" || value === "neumann") return "pioneers";
         if (value === "turingzh" || value === "neumannzh") return "pioneerszh";
-        return value === "maid" || value === "chibi" || value === "whale" || value === "earth" || value === "pan" || value === "pioneers" || value === "pioneerszh" || value === "smoke" ? value : "none";
+        return value === "maid" || value === "chibi" || value === "whale" || value === "earth" || value === "pan" || value === "pioneers" || value === "pioneerszh" || value === "console" || value === "smoke" ? value : "none";
       }
       function readPreset(key) {
         try {
           const saved = window.localStorage.getItem(key);
           if (saved === "turing" || saved === "neumann") return "pioneers";
           if (saved === "turingzh" || saved === "neumannzh") return "pioneerszh";
-          if (saved === "maid" || saved === "chibi" || saved === "whale" || saved === "earth" || saved === "pan" || saved === "pioneers" || saved === "pioneerszh" || saved === "smoke" || saved === "none") return saved;
+          if (saved === "maid" || saved === "chibi" || saved === "whale" || saved === "earth" || saved === "pan" || saved === "pioneers" || saved === "pioneerszh" || saved === "console" || saved === "smoke" || saved === "none") return saved;
         } catch (error) {
         }
-        return "smoke";
+        return "console";
       }
       let heroPreset = readPreset(HERO_PRESET_KEY);
       let workPreset = readPreset(WORK_PRESET_KEY);
@@ -624,6 +639,9 @@ uniform float u_heroFade;
 uniform float u_heroScale;
 uniform float u_heroEarth;
 uniform float u_heroPan;
+uniform float u_heroConsole;
+uniform float u_flow;
+uniform float u_amp;
 uniform highp sampler2D u_earth;
 uniform highp sampler2D u_logo;
 uniform vec4 u_logoRect;
@@ -819,6 +837,47 @@ void main() {
     }
     float hshown = max(u_reveal, min(1.0, 2.0 * hand.w + warm));
     o = vec4(heroStrength * hshown, 1.0, 0.5, hshown);
+    return;
+  }
+  if (u_heroConsole > 0.5) {
+    // PS4 CD-plate: three translucent sheets drawn as code glyphs through the
+    // engine's own field. The Claude-reverse-engineered taps/wakes are applied
+    // here exactly like the other hero fields, so the click ripple is native.
+    vec2 pane = max(u_paneCss, vec2(1.0));
+    float ripple = clamp(abs(hand.z) * 0.55 + hand.w * 0.35 + warm * 0.40, 0.0, 1.0);
+    vec2 jitter = vec2(
+      noise(vec3(p * 0.012, u_time * 2.6), 0x61u),
+      noise(vec3(p * 0.012 + vec2(7.7, 2.0), u_time * 2.6 + 2.0), 0x62u)) - 0.5;
+    vec2 pp = p + (hand.xy * 0.30 + jitter * (10.0 + 46.0 * ripple)) * ripple;
+    vec2 s = clamp(pp / pane, vec2(0.0), vec2(1.0));
+    float x = s.x;
+    float energy = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float k = float(i);
+      float phase = u_flow*0.085;
+      float waveCenter = 0.115*sin(x*4.1-phase)
+        + 0.055*sin(x*2.4+phase*0.67)
+        + (k-1.0)*0.064*sin(x*3.7-phase*0.55+0.8)
+        + 0.025*sin(x*6.0+phase*0.40+k*1.6);
+      float flatCenter = (k-1.0)*0.064;
+      float center = 0.59 + mix(flatCenter, waveCenter, u_amp);
+      float turn = mix(0.5, 0.5+0.5*sin(x*4.7-phase*0.61+k*1.65), u_amp);
+      float width = 0.018+0.082*turn*turn+k*0.008;
+      float d = s.y - center;
+      float across = d/width;
+      float body = 1.0-smoothstep(0.72, 1.08, abs(across));
+      float facing = 0.5+0.5*cos(x*3.0-phase*0.35+k*1.9);
+      float rimU = exp(-pow((across+0.78)/0.20, 2.0)) * (0.23+0.19*facing);
+      float rimL = exp(-pow((across-0.84)/0.22, 2.0)) * (0.08+0.06*(1.0-facing));
+      float depth = 1.0-k*0.22;
+      energy += (body*(0.10+0.09*facing) + rimU + rimL)*depth;
+    }
+    energy = 1.0 - exp(-energy*3.2);
+    float holes = noise(vec3(p / 24.0, u_time * 2.2), 0x63u);
+    energy *= 1.0 - 0.90 * ripple * smoothstep(0.10, 0.55, holes);
+    energy += hand.z * 0.6 + warm * 0.35;
+    float seen = max(u_reveal, min(1.0, 2.0 * hand.w + warm));
+    o = vec4(clamp(energy, 0.0, 1.6) * seen, 1.0, 0.5, 1.0);
     return;
   }
   if (u_hero > 0.5) {
@@ -1095,6 +1154,7 @@ void main() {
         gl.uniform1i(loc(windProgram, "u_earth"), UNITS.earth);
         gl.uniform1f(loc(windProgram, "u_hero"), 0);
         gl.uniform1f(loc(windProgram, "u_heroEarth"), 0);
+        gl.uniform1f(loc(windProgram, "u_heroConsole"), 0);
         gl.uniform1f(loc(windProgram, "u_heroPan"), 0);
         gl.useProgram(glyphProgram);
         gl.uniform1i(loc(glyphProgram, "u_wind"), UNITS.wind);
@@ -1141,6 +1201,8 @@ void main() {
           originCss: loc(windProgram, "u_originCss"),
           paneCss: loc(windProgram, "u_paneCss"),
           canvasCss: loc(windProgram, "u_canvasCss"),
+          flow: loc(windProgram, "u_flow"),
+          amp: loc(windProgram, "u_amp"),
           glyphTime: loc(glyphProgram, "u_time"),
           count: loc(glyphProgram, "u_count"),
           grid: loc(glyphProgram, "u_grid"),
@@ -1155,6 +1217,7 @@ void main() {
           heroFade: loc(windProgram, "u_heroFade"),
           heroScale: loc(windProgram, "u_heroScale"),
           heroEarth: loc(windProgram, "u_heroEarth"),
+          heroConsole: loc(windProgram, "u_heroConsole"),
           heroPan: loc(windProgram, "u_heroPan"),
           heroGlyph: loc(glyphProgram, "u_hero"),
           logoRect: loc(windProgram, "u_logoRect")
@@ -1486,6 +1549,7 @@ void main() {
           gl.uniform1f(U.heroDetail, maskPreset === "maid" || maskPreset === "chibi" || maskPreset === "turing" || maskPreset === "turingzh" || maskPreset === "neumann" || maskPreset === "neumannzh" || maskPreset === "shannon" || maskPreset === "shannonzh" ? 1 : 0);
           gl.uniform1f(U.heroStill, maskPreset === "turing" || maskPreset === "turingzh" || maskPreset === "neumann" || maskPreset === "neumannzh" || maskPreset === "shannon" || maskPreset === "shannonzh" ? 1 : 0);
           gl.uniform1f(U.heroEarth, maskPreset === "earth" ? 1 : 0);
+          gl.uniform1f(U.heroConsole, maskPreset === "console" ? 1 : 0);
           gl.uniform1f(U.heroPan, maskPreset === "pan" ? 1 : 0);
           gl.useProgram(glyphProgram);
           gl.uniform1f(U.heroGlyph, active ? 1 : 0);
@@ -1513,6 +1577,8 @@ void main() {
           gl.viewport(0, 0, columns, rows * 2);
           gl.useProgram(windProgram);
           gl.uniform1f(U.windTime, state.time);
+          gl.uniform1f(U.flow, typeof state.flow === "number" ? state.flow : state.time);
+          gl.uniform1f(U.amp, typeof state.amp === "number" ? state.amp : 1);
           gl.uniform1f(U.reveal, state.reveal);
           if (U.heroFade) {
             if (fadeAnim !== null) {
@@ -1731,8 +1797,58 @@ void main() {
         const x = Math.min(1, Math.max(0, t));
         return x * x * (3 - 2 * x);
       }
-      function CodeRippleBackground() {
+      let taskRunning = false;
+      let agentMood = "idle";
+      let agentErrorAt = 0;
+      let lastAgentErrorSeen = "";
+      function isAnyTaskRunning(statuses, sessions) {
+        let active = false;
+        if (statuses && typeof statuses.forEach === "function") {
+          statuses.forEach(function(status) {
+            if (status && status.running === true) active = true;
+          });
+        }
+        if (!active && sessions && sessions.byId) {
+          const ids = Object.keys(sessions.byId);
+          for (let i = 0; i < ids.length; i += 1) {
+            const session = sessions.byId[ids[i]];
+            if (session && session.running === true) active = true;
+          }
+        }
+        return active;
+      }
+      function CodeRippleBackground(props) {
         const hostRef = React.useRef(null);
+        const useSessionStatus = props && props.useSessionStatus;
+        const useSessions = props && props.useSessions;
+        const statuses = useSessionStatus ? useSessionStatus((snapshot) => snapshot) : null;
+        const sessions = useSessions ? useSessions((snapshot) => snapshot) : null;
+        React.useEffect(() => {
+          let runningNow = false;
+          let waitingNow = false;
+          if (statuses && typeof statuses.forEach === "function") {
+            statuses.forEach(function(status) {
+              if (!status) return;
+              if (status.running === true) runningNow = true;
+              if (status.pendingInteraction) waitingNow = true;
+            });
+          }
+          if (sessions && sessions.byId) {
+            const ids = Object.keys(sessions.byId);
+            for (let i = 0; i < ids.length; i += 1) {
+              const session = sessions.byId[ids[i]];
+              if (!session) continue;
+              if (session.running === true) runningNow = true;
+              const failure = session.lastAgentError;
+              if (typeof failure === "string" && failure.length > 0 && failure !== lastAgentErrorSeen) {
+                lastAgentErrorSeen = failure;
+                agentErrorAt = performance.now();
+              }
+            }
+          }
+          taskRunning = runningNow;
+          agentMood = waitingNow ? "waiting" : runningNow ? "working" : "idle";
+        }, [statuses, sessions]);
         React.useEffect(() => {
           const anchor = hostRef.current;
           const overlay = anchor && anchor.closest("[data-shell-overlay]");
@@ -1775,7 +1891,43 @@ void main() {
           rememberLook(params.key);
           host.dataset.landingTexture = "canvas";
           layer.canvas.dataset.look = params.key + "/" + params.seed.toString(16);
-          layer.canvas.dataset.version = "3.5.0";
+          layer.canvas.dataset.version = "3.7.0";
+          let streamChars = 0;
+          let streamRate = 0;
+          let streamSample = 0;
+          const streamObserver = typeof MutationObserver !== "undefined" ? new MutationObserver(function(records) {
+            for (let i = 0; i < records.length; i += 1) {
+              const record = records[i];
+              if (record.type === "characterData") {
+                const target = record.target;
+                const element = target && (target.nodeType === 1 ? target : target.parentElement);
+                if (!element || !element.closest) continue;
+                if (!element.closest('[data-slot="conversation.content"], [data-conversation-scroll], [data-slot="conversation.session"]')) continue;
+                const next = target.nodeValue ? target.nodeValue.length : 0;
+                const previous = record.oldValue ? record.oldValue.length : 0;
+                if (next > previous) streamChars += next - previous;
+                continue;
+              }
+              if (record.type !== "childList") continue;
+              for (let n = 0; n < record.addedNodes.length; n += 1) {
+                const node = record.addedNodes[n];
+                const element = node && node.parentElement;
+                if (!element || !element.closest) continue;
+                if (element.closest('[data-slot*="composer"], textarea, input, [contenteditable="true"]')) continue;
+                if (!element.closest('[data-slot="conversation.content"], [data-conversation-scroll], [data-slot="conversation.session"]')) continue;
+                const text = node.textContent || "";
+                if (text.length > 0 && text.length <= 200) streamChars += text.length;
+              }
+            }
+          }) : null;
+          if (streamObserver) {
+            streamObserver.observe(centerCol, {
+              subtree: true,
+              childList: true,
+              characterData: true,
+              characterDataOldValue: true
+            });
+          }
           const touch = createTouch();
           let scheme = readScheme();
           let ink = colorParts(readThemeInk());
@@ -1827,6 +1979,21 @@ void main() {
           let stale = 0;
           let resizeTimer = 0;
           let grid = null;
+          let flowTime = 0;
+          let flowSpeed = 1;
+          let flowCoastFrom = 1;
+          let waitMix = 0;
+          let errorMix = 0;
+          let activePreset = "none";
+          let flowPeriod = 18 + Math.random() * 18;
+          let flowPhase = Math.random() * Math.PI * 2;
+          let flowRandFrom = 0.3 + Math.random() * 0.4;
+          let flowRandTo = Math.random();
+          let flowRandStart = 0;
+          let flowRandDur = 6 + Math.random() * 6;
+          let flowAmp = 1;
+          let taskWasRunning = false;
+          let taskEndAt = -1;
           function measure() {
             host.style.top = "0px";
             host.style.height = "100%";
@@ -1852,20 +2019,125 @@ void main() {
             timer = 0;
             if (!running || document.hidden) return;
             const busy = touch.busy(clock);
+            const flowing = streamRate > 6 || flowAmp < 0.999 || flowSpeed > 1.6 || flowSpeed < 0.4;
+            const frameMs = busy ? CONFIG.power.rippleFrameMs : flowing ? CONFIG.power.flowFrameMs : CONFIG.power.frameMs;
             timer = setTimeout(function() {
               timer = 0;
               raf = requestAnimationFrame(frame);
-            }, busy ? CONFIG.power.rippleFrameMs : CONFIG.power.frameMs);
+            }, frameMs);
           }
           function frame(now) {
             raf = 0;
             const dt = Math.min(Math.max(now - before, 0), 250);
             before = now;
             clock += dt / 1e3;
+            const dtSec = dt / 1e3;
+            const running2 = taskRunning;
+            streamSample += dtSec;
+            if (streamSample >= 0.2) {
+              const charsPerSecond = streamChars / streamSample;
+              streamChars = 0;
+              streamSample = 0;
+              const tokensPerSecond = charsPerSecond / CONFIG.flow.charsPerToken;
+              const blend = tokensPerSecond > streamRate ? 0.55 : 0.18;
+              streamRate += (tokensPerSecond - streamRate) * blend;
+              if (streamRate < 0.1) streamRate = 0;
+            } else {
+              streamRate *= Math.max(0, 1 - dtSec / 1.2);
+            }
+            const coast = CONFIG.flow.coast;
+            if (running2) {
+              taskEndAt = -1;
+              flowAmp += (1 - flowAmp) * Math.min(1, dtSec / 0.35);
+            } else if (taskWasRunning) {
+              taskEndAt = clock;
+              flowCoastFrom = Math.max(flowSpeed, 1.5);
+            } else if (taskEndAt >= 0) {
+              const since = clock - taskEndAt;
+              if (since < coast) {
+                flowAmp = 1;
+              } else if (since < coast + CONFIG.flow.settle) {
+                flowAmp = 1 - smoothstep((since - coast) / CONFIG.flow.settle);
+              } else if (since < coast + CONFIG.flow.settle + CONFIG.flow.hold) {
+                flowAmp = 0;
+              } else {
+                flowAmp = smoothstep(
+                  (since - coast - CONFIG.flow.settle - CONFIG.flow.hold) / CONFIG.flow.resume
+                );
+              }
+            } else {
+              flowAmp = 1;
+            }
+            taskWasRunning = running2;
+            if (clock > flowRandStart + flowRandDur) {
+              flowRandFrom = flowRandTo;
+              flowRandTo = Math.random();
+              flowRandStart = clock;
+              flowRandDur = 6 + Math.random() * 7;
+            }
+            const drift = flowRandFrom + (flowRandTo - flowRandFrom) * smoothstep((clock - flowRandStart) / flowRandDur);
+            const swell = 0.5 + 0.5 * Math.sin(clock * Math.PI * 2 / flowPeriod + flowPhase);
+            const speed01 = 0.5 * swell + 0.5 * drift;
+            const baseSpeed = CONFIG.flow.min + (CONFIG.flow.max - CONFIG.flow.min) * Math.pow(speed01, 1.35);
+            let flowTarget;
+            if (running2) {
+              const boost = Math.min(1, Math.pow(streamRate / CONFIG.flow.rateMax, 0.9));
+              flowTarget = baseSpeed + (CONFIG.flow.fast - baseSpeed) * boost;
+            } else if (taskEndAt >= 0) {
+              const coastEase = smoothstep(Math.min(1, (clock - taskEndAt) / coast));
+              if (clock - taskEndAt < coast) {
+                flowTarget = baseSpeed + (flowCoastFrom - baseSpeed) * (1 - coastEase);
+              } else if (flowAmp > 0) {
+                flowTarget = baseSpeed * (0.3 + 0.7 * flowAmp);
+              } else {
+                flowTarget = baseSpeed * 0.3;
+              }
+            } else {
+              flowTarget = baseSpeed;
+            }
+            flowSpeed += (flowTarget - flowSpeed) * Math.min(1, dtSec / CONFIG.flow.smooth);
+            flowTime += dtSec * flowSpeed;
             if (!start) start = clock;
             reveal = smoothstep((clock - start) / CONFIG.wind.revealS);
             layer.canvas.style.opacity = String(strength);
-            layer.draw({ time: clock * CONFIG.wind.energy, reveal, touch: touch.frame(clock, host.clientWidth) });
+            const nowMs = performance.now();
+            const errorActive = nowMs - agentErrorAt < 4200;
+            const waitActive = !errorActive && agentMood === "waiting";
+            waitMix += ((waitActive ? 1 : 0) - waitMix) * Math.min(1, dtSec / 0.8);
+            errorMix += ((errorActive ? 1 : 0) - errorMix) * Math.min(1, dtSec / 0.45);
+            const breath = 0.5 + 0.5 * Math.sin(clock * Math.PI * 2 / (errorActive ? 0.9 : 3.2));
+            const warm = waitMix * (0.45 + 0.25 * breath);
+            const bad = errorMix * (0.6 + 0.35 * breath);
+            const glowBase = CONFIG.glow.color[scheme];
+            let inkR = ink.rgb[0];
+            let inkG = ink.rgb[1];
+            let inkB = ink.rgb[2];
+            let glowR = glowBase[0];
+            let glowG = glowBase[1];
+            let glowB = glowBase[2];
+            inkR += (1 - inkR) * warm;
+            inkG += (0.79 - inkG) * warm;
+            inkB += (0.5 - inkB) * warm;
+            glowR += (1 - glowR) * warm;
+            glowG += (0.6 - glowG) * warm;
+            glowB += (0.24 - glowB) * warm;
+            inkR += (1 - inkR) * bad;
+            inkG += (0.55 - inkG) * bad;
+            inkB += (0.5 - inkB) * bad;
+            glowR += (1 - glowR) * bad;
+            glowG += (0.32 - glowG) * bad;
+            glowB += (0.3 - glowB) * bad;
+            if (activePreset === "console") {
+              layer.setInk([inkR, inkG, inkB], ink.alpha);
+              layer.setGlow([glowR, glowG, glowB]);
+            }
+            layer.draw({
+              time: clock * CONFIG.wind.energy,
+              reveal,
+              touch: touch.frame(clock, host.clientWidth),
+              flow: flowTime,
+              amp: flowAmp * (1 - 0.28 * Math.min(1, Math.max(0, (flowSpeed - 3) / (CONFIG.flow.fast - 3))))
+            });
             schedule();
           }
           function isOverInteractive(event) {
@@ -2010,7 +2282,7 @@ void main() {
           function computeBackgroundRect(preset) {
             const width = Math.max(1, host.clientWidth);
             const height = Math.max(1, host.clientHeight);
-            if (preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "pioneers" || preset === "pioneerszh") {
+            if (preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "pioneers" || preset === "pioneerszh" || preset === "console") {
               return { left: 0, top: 0, width, height };
             }
             const aspect = LOGO_VIEWBOX.width / LOGO_VIEWBOX.height;
@@ -2033,69 +2305,77 @@ void main() {
           const PIONEER_EN = ["turing", "neumann", "shannon"];
           const PIONEER_ZH = ["turingzh", "neumannzh", "shannonzh"];
           const PIONEER_INTERVAL_MS = 11e3;
-          const PIONEER_RIPPLE_DELAY_MS = 460;
           let pioneerTimer = 0;
           let pioneerToken = 0;
-          let pioneerKey = "";
-          let pioneerPhase = "";
+          let pioneerFamily = "";
+          let pioneerFrames = null;
+          let pioneerIndex = 0;
           let pioneerCurrent = "";
+          let pioneerRect = null;
+          let pioneerDpr = 1;
           function stopPioneerRotation() {
             pioneerToken += 1;
             if (pioneerTimer) {
               window.clearTimeout(pioneerTimer);
               pioneerTimer = 0;
             }
-            pioneerKey = "";
-            pioneerPhase = "";
+            pioneerFamily = "";
+            pioneerFrames = null;
           }
-          function startPioneerRotation(frames, rect, dpr) {
-            const token = ++pioneerToken;
-            let index = 0;
-            function showCurrent() {
-              pioneerCurrent = frames[index % frames.length];
-              layer.setHero(true, rect, dpr, pioneerCurrent);
-              index += 1;
-            }
-            function scheduleNext() {
-              pioneerTimer = window.setTimeout(switchNext, PIONEER_INTERVAL_MS);
-            }
-            function switchNext() {
+          function showPioneerCurrent() {
+            if (pioneerFrames === null || pioneerRect === null) return;
+            const index = (pioneerIndex % pioneerFrames.length + pioneerFrames.length) % pioneerFrames.length;
+            pioneerCurrent = pioneerFrames[index];
+            layer.setHero(true, pioneerRect, pioneerDpr, pioneerCurrent);
+          }
+          function switchPioneer() {
+            const token = pioneerToken;
+            layer.startFadeSwap(function() {
               if (token !== pioneerToken) return;
-              layer.startFadeSwap(function() {
-                if (token !== pioneerToken) return;
-                showCurrent();
-              });
-              scheduleNext();
-            }
-            showCurrent();
-            scheduleNext();
+              pioneerIndex += 1;
+              showPioneerCurrent();
+            });
+            pioneerTimer = window.setTimeout(switchPioneer, PIONEER_INTERVAL_MS);
+          }
+          function startPioneerRotation(family2, frames, rect, dpr) {
+            pioneerToken += 1;
+            pioneerFamily = family2;
+            pioneerFrames = frames;
+            pioneerIndex = 0;
+            pioneerRect = rect;
+            pioneerDpr = dpr;
+            showPioneerCurrent();
+            if (pioneerTimer) window.clearTimeout(pioneerTimer);
+            pioneerTimer = window.setTimeout(switchPioneer, PIONEER_INTERVAL_MS);
           }
           function applyBackground() {
             const phase = currentConversationPhase();
             const preset = presetForPhase(phase);
-            const next = preset === "whale" || preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "pioneers" || preset === "pioneerszh";
+            activePreset = preset;
+            const next = preset === "whale" || preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "console" || preset === "pioneers" || preset === "pioneerszh";
             layer.setBackgroundVisible(preset !== "none");
-            const targetCell = next ? preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "pioneers" || preset === "pioneerszh" ? 4.5 : 5 : BASE_CELL_CSS;
+            const targetCell = next ? preset === "maid" || preset === "chibi" || preset === "earth" || preset === "pan" || preset === "pioneers" || preset === "pioneerszh" || preset === "console" ? 4.5 : 5 : BASE_CELL_CSS;
             if (CONFIG.grid.cellCss !== targetCell) {
               CONFIG.grid.cellCss = targetCell;
               measure();
             }
             CONFIG.power.frameMs = preset === "earth" ? 16 : BASE_FRAME_MS;
             layer.setTextPhase(phase === "hero" ? "hero" : "active");
+            layer.setInk(ink.rgb, ink.alpha);
+            layer.setGlow(CONFIG.glow.color[scheme]);
             const rect = next ? computeBackgroundRect(preset) : null;
-            const pioneerFrames = preset === "pioneers" ? PIONEER_EN : preset === "pioneerszh" ? PIONEER_ZH : null;
-            if (pioneerFrames !== null && rect !== null) {
-              const key = preset + "|" + rect.width + "x" + rect.height;
-              if (key !== pioneerKey) {
+            const familyNow = preset === "pioneers" || preset === "pioneerszh" ? "pioneers" : "";
+            const framesNow = preset === "pioneerszh" ? PIONEER_ZH : PIONEER_EN;
+            if (familyNow !== "" && rect !== null) {
+              const dpr = window.devicePixelRatio || 1;
+              if (familyNow !== pioneerFamily) {
                 stopPioneerRotation();
-                pioneerKey = key;
-                pioneerPhase = phase;
-                startPioneerRotation(pioneerFrames, rect, window.devicePixelRatio || 1);
-              } else if (pioneerPhase !== phase) {
-                pioneerPhase = phase;
-                if (pioneerCurrent) {
-                  layer.setHero(true, rect, window.devicePixelRatio || 1, pioneerCurrent);
-                }
+                startPioneerRotation(familyNow, framesNow, rect, dpr);
+              } else {
+                pioneerRect = rect;
+                pioneerDpr = dpr;
+                pioneerFrames = framesNow;
+                showPioneerCurrent();
               }
             } else {
               stopPioneerRotation();
@@ -2182,6 +2462,7 @@ void main() {
             if (themeTimer) clearTimeout(themeTimer);
             if (frameObserver) frameObserver.disconnect();
             if (childObserver) childObserver.disconnect();
+            if (streamObserver) streamObserver.disconnect();
             if (sidebarObserver) sidebarObserver.disconnect();
             if (resizeObserver) resizeObserver.disconnect();
             presetListeners.delete(onPresetChange);

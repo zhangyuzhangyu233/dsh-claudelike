@@ -1,9 +1,9 @@
 {
   "name": "dsh-coderipple",
-  "version": "3.5.0",
+  "version": "3.7.0",
   "private": false,
   "type": "module",
-  "description": "Seven switchable code-art background presets (ambient code field, DeepSeek whale, maid portraits, rotating 3D globe, and a static earth-continent map without Antarctica) for the DeepSeek Harness Web UI.",
+  "description": "Ten switchable code-art background presets for the DeepSeek Harness Web UI. Default: the PS4 Flow-inspired console ribbons whose flow speed follows the agent's live token output (and slow down/flatten when a task ends); plus Claude wind field, DeepSeek whale, maid portraits, a rotating 3D globe, earth-continent map and computing-pioneers portraits.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
