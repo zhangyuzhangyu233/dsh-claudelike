@@ -963,6 +963,7 @@ uniform float u_time, u_fill, u_flick;
 uniform int u_count;
 uniform vec4 u_cellCss;
 uniform float u_hero;
+uniform float u_cellUniform;
 out vec2 v_shift;
 out vec4 v_box;
 out vec2 v_glow;
@@ -1005,9 +1006,15 @@ void main() {
     }
   }
   int g = int(texelFetch(u_sequence, ivec2((int(cell >> 8u) + steps) % u_count, 0), 0).r * 255.0 + 0.5);
-  uvec4 box = texelFetch(u_boxes, ivec2(g, 0), 0);
   ivec2 origin = c * u_cell;
-  ivec2 px = origin + ivec2(box.xy) + CORNER[gl_VertexID - id * 6] * ivec2(box.zw);
+  ivec2 px;
+  if (u_cellUniform > 0.5) {
+    // Non-default skins: fixed monospace cell, every ASCII glyph same size.
+    px = origin + CORNER[gl_VertexID - id * 6] * (u_cell - 1);
+  } else {
+    uvec4 box = texelFetch(u_boxes, ivec2(g, 0), 0);
+    px = origin + ivec2(box.xy) + CORNER[gl_VertexID - id * 6] * ivec2(box.zw);
+  }
   ivec2 home = ivec2(g & 15, g >> 4) * u_cell;
   v_shift = vec2(home - origin);
   v_box = vec4(home, home + u_cell - 1);
@@ -1258,6 +1265,7 @@ void main() {
         heroConsole: loc(windProgram, 'u_heroConsole'),
         heroPan: loc(windProgram, 'u_heroPan'),
         heroGlyph: loc(glyphProgram, 'u_hero'),
+        cellUniform: loc(glyphProgram, 'u_cellUniform'),
         logoRect: loc(windProgram, 'u_logoRect'),
       };
 
@@ -1581,6 +1589,7 @@ void main() {
         gl.uniform1f(U.heroPan, maskPreset === 'pan' ? 1 : 0);
         gl.useProgram(glyphProgram);
         gl.uniform1f(U.heroGlyph, active ? 1 : 0);
+        gl.uniform1f(U.cellUniform, active ? 1 : 0);
         if (active && rect) {
           uploadLogoMask(rect, dpr || 1, maskPreset);
           gl.useProgram(windProgram);
@@ -2570,12 +2579,9 @@ void main() {
             || preset === 'pioneers' || preset === 'pioneerszh';
           // "none" hides the whole field; "smoke" is the original ambient code wind.
           layer.setBackgroundVisible(preset !== 'none');
-          // Presets are drawn with a denser grid so the artwork stays crisp.
-          const targetCell = next
-            ? (preset === 'maid' || preset === 'chibi' || preset === 'earth' || preset === 'pan'
-              || preset === 'pioneers' || preset === 'pioneerszh'
-              || preset === 'console' ? 4.5 : 5.0)
-            : BASE_CELL_CSS;
+          // Uniform glyph size: every preset (including the artwork ones) uses the
+          // same monospace cell as the default Claude field.
+          const targetCell = BASE_CELL_CSS;
           if (CONFIG.grid.cellCss !== targetCell) {
             CONFIG.grid.cellCss = targetCell;
             measure();
